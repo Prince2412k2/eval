@@ -1,16 +1,18 @@
-
 from typing import List, Dict, Optional, Tuple, Iterable
-from dataclasses import dataclass, asdict
 import uuid
+from fastembed.common.types import NumpyArray
 import numpy as np
+from app.schema.chunk import Chunk
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 
 
 
+
+
 class EmbeddingService:
     @staticmethod
-    def embed_chunks(chunks: List[Chunk]) -> List[np.ndarray]:
+    def embed_chunks(chunks: List[Chunk]) -> Iterable[NumpyArray]:
         """
         Embed chunk texts and return embeddings.
         Returns vectors of 384 dimensions.
@@ -34,7 +36,6 @@ class VectorService:
     async def upsert_chunks(
         qdrant: AsyncQdrantClient,
         document_id: str,
-        owner_id: Optional[uuid.UUID],
         chunks: List[Chunk],
         embeddings: Iterable[np.ndarray],
     ):
@@ -49,7 +50,6 @@ class VectorService:
             # Build comprehensive payload
             payload = {
                 "document_id": document_id,
-                "owner_id": str(owner_id) if owner_id else None,
                 "text": chunk.text,
                 "page": chunk.page,
                 "chunk_index": chunk.chunk_index,
@@ -96,27 +96,16 @@ class VectorService:
         qdrant: AsyncQdrantClient,
         query_embedding: np.ndarray,
         top_k: int = 15,
-        owner_id: Optional[uuid.UUID] = None,
         document_ids: Optional[List[str]] = None,
         score_threshold: Optional[float] = None,
-    ) -> Tuple[str, List[Dict], List[str]]:
+    ) -> List[Dict]:
         """
         Queries Qdrant for the most similar chunks to the given embedding.
         
         Returns:
-            - context: Formatted string with all chunk texts
-            - chunks_metadata: List of dicts with chunk details
-            - source_doc_ids: List of unique document IDs
+            List of dicts with chunk details including text, score, document_id, page, etc.
         """
         filters = []
-        
-        if owner_id is not None:
-            filters.append(
-                qmodels.FieldCondition(
-                    key="owner_id", 
-                    match=qmodels.MatchValue(value=str(owner_id))
-                )
-            )
         
         if document_ids:
             filters.append(
@@ -128,19 +117,17 @@ class VectorService:
         
         query_filter = qmodels.Filter(must=filters) if filters else None
         
-        results = await qdrant.search(
+        results = await qdrant.query_points(
             collection_name=VectorService.COLLECTION_NAME,
-            query_vector=query_embedding.tolist(),
+            query=query_embedding.tolist(),
             query_filter=query_filter,
             limit=top_k,
             score_threshold=score_threshold,
         )
         
-        context = ""
-        chunks_metadata = []
-        source_doc_ids = set()
+        chunks_data = []
         
-        for r in results:
+        for r in results.points:
             if not r.payload:
                 continue
             
@@ -148,20 +135,45 @@ class VectorService:
             if not text:
                 continue
             
-            doc_id = r.payload.get("document_id")
-            source_doc_ids.add(doc_id)
-            
-            # Build context string
-            context += f"[Page {r.payload.get('page', 'N/A')}] (Score: {r.score:.4f})\n{text}\n---\n\n"
-            
-            # Collect metadata for each chunk
-            chunks_metadata.append({
+            chunks_data.append({
                 "text": text,
                 "score": r.score,
-                "document_id": doc_id,
+                "document_id": r.payload.get("document_id"),
                 "page": r.payload.get("page"),
                 "chunk_index": r.payload.get("chunk_index"),
                 "metadata": r.payload.get("metadata", {}),
             })
         
-        return context, chunks_metadata, list(source_doc_ids)
+        return chunks_data
+    
+    @staticmethod
+    def format_context(chunks_data: List[Dict]) -> str:
+        """
+        Format retrieved chunks into a context string.
+        Args:
+            chunks_data: List of chunk dicts from query_similar_chunks
+        Returns:
+            Formatted context string
+        """
+        context = ""
+        for chunk in chunks_data:
+            page = chunk.get("page", "N/A")
+            score = chunk.get("score", 0.0)
+            text = chunk.get("text", "")
+            context += f"[Page {page}] (Score: {score:.4f})\n{text}\n---\n\n"
+        return context
+    
+    @staticmethod
+    def get_source_documents(chunks_data: List[Dict]) -> List[str]:
+        """
+        Extract unique document IDs from chunks data.
+        
+        Args:
+            chunks_data: List of chunk dicts from query_similar_chunks
+            
+        Returns:
+            List of unique document IDs
+        """
+        return list(set(chunk.get("document_id") for chunk in chunks_data if chunk.get("document_id")))
+
+

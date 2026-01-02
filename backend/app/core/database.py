@@ -1,14 +1,13 @@
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
-from app.models import Base, Document, Conversation, Message
+from app.models import Base, Document
 
 from sqlalchemy import text as sql_text
 
 
 engine = create_async_engine(
     settings.DB_URL,
-    # echo=True,
     future=True,
     connect_args={"server_settings": {"search_path": "public"}},
 )

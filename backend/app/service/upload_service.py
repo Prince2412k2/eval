@@ -1,109 +1,178 @@
+import hashlib
+from datetime import datetime
+from typing import List
+from uuid import UUID
 
-from typing import Dict, List
-from fastapi import UploadFile
-import json
-import logging
-import mimetypes
-import tempfile
-import os
-from fastapi import UploadFile
-from pathlib import Path
-from pydantic import ValidationError
-from app.core.llamaindex import LlamaIndex, get_llama
+from fastapi import HTTPException, UploadFile, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from supabase import AsyncClient
+from app.core.supabase import get_supabase
 
-logger = logging.getLogger(__name__)
+from app.core.config import Defaults
+from app.models import Document
 
 
-class TextParser:
+
+#Schema
+
+class DocumentBase(BaseModel):
+    mime_type: str
+    title: str = Field(..., min_length=1, max_length=255)
+
+class DocumentCreate(DocumentBase):
+    pass
+
+class DocumentUpdate(BaseModel):
+    title: str | None = Field(None, max_length=255)
+
+class DocumentRead(DocumentBase):
+    id: UUID
+    created_at: datetime
+    hash: str
+    signed_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+#Services 
+
+class SupabaseFileCRUD:
     @staticmethod
-    def parse(path: str|Path,page_size=2000) -> List[Dict]:
-        """
-        Return text
-        """
-        with open(path, "rb") as f:
-            text=f.read().decode("utf-8",errors="ignore")
-            return [
-                {"page": int(i/page_size)+1, "text": text[i : i + page_size]}
-                for i in range(0, len(text), page_size)
-            ]
+    async def _hash_bytes(file:UploadFile) -> str:
+        await file.seek(0)
+        data=await file.read()
+        return hashlib.sha256(data).hexdigest()
 
-
-
-class LLamaParser:
     @staticmethod
-    async def parse(file_path: str|Path)->List[dict]:
-        file_path = Path(file_path)
+    def _build_path(file_hash: str, filename: str) -> str:
+        ext = ""
+        if "." in filename:
+            ext = "." + filename.split(".")[-1]
+        return f"{file_hash[:2]}/{file_hash}{ext}"
 
-
-        # JSON output
-        parser=await get_llama()
-        docs = await parser.aload_data(str(file_path))
-        print(docs)
-
-        output=[{"page":idx+1,"text":i.text} for idx,i in enumerate(docs)]
-
-        return output
-
-class DocumentService:
     @staticmethod
-    async def parse(file: UploadFile )->List[dict]:
-        """ Validate if file is TXT, PDF and DOCX else raise ValueError """
-        content_type = file.content_type or ""
-        suffix = mimetypes.guess_extension(content_type) or ""
-        tmp_path = None
-
+    async def create(
+        file:UploadFile,
+        file_hash:str
+    ) -> dict:
+        supabase=await get_supabase()
         try:
             await file.seek(0)
-            raw_bytes = await file.read()
-            await file.seek(0)
+            content = await file.read()
+            content_type: str = file.content_type if file.content_type else ""
 
-            if not raw_bytes:
-                raise ValidationError("Empty file")
+            res = await supabase.storage.from_(Defaults.BUCKET_NAME).upload(
+                path=file_hash,
+                file=content,
+            file_options={
+                "content-type": content_type,
+                "cache-control": "3600",
+                "upsert": "true",
+            },)
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(raw_bytes)
-                tmp_path = tmp.name
+            if isinstance(res, dict) and res.get("error"):
+                raise RuntimeError(res["error"]["message"])
 
+        except Exception as e:
+            raise RuntimeError(f"Supabase upload failed: {e}")
 
-            return await DocumentService.validate_file( content_type ,tmp_path)
+        return {
+            "name": file_hash,
+            "Defaults.BUCKET_NAME": Defaults.BUCKET_NAME,
+            "created_at": datetime.utcnow().isoformat(),
+        }
 
+    @staticmethod
+    async def read(path: str) -> bytes:
+        supabase=await get_supabase()
+        try:
+            return await supabase.storage.from_(Defaults.BUCKET_NAME).download(path)
+        except Exception as e:
+            raise FileNotFoundError(f"File not found: {e}")
 
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
+    @staticmethod
+    async def delete(path: str) -> None:
+        supabase=await get_supabase()
+        try:
+            res = await supabase.storage.from_(Defaults.BUCKET_NAME).remove([path])
+            if isinstance(res, dict) and res.get("error"):
+                raise RuntimeError(res["error"]["message"])
+        except Exception as e:
+            raise RuntimeError(f"Delete failed: {e}")
 
+    @staticmethod
+    async def listall(prefix: str = "") -> List[dict]:
+
+        supabase=await get_supabase()
+        try:
+            return await supabase.storage.from_(Defaults.BUCKET_NAME).list(prefix)
+        except Exception as e:
+            raise RuntimeError(f"List failed: {e}")
+
+    @staticmethod
+    async def exists(path: str) -> bool:
+        try:
+            files = await SupabaseFileCRUD.listall(prefix=path.rsplit("/", 1)[0])
+            return any(f["name"] == path.split("/")[-1] for f in files)
+        except Exception:
+            return False
+
+class DocumentCRUD:
+    @staticmethod
+    async def create(
+        db: AsyncSession, document_data: DocumentCreate, doc_hash: str
+    ) -> Document:
+        """Create a new document if not already stored (deduplicated by hash)."""
+
+        new_doc = Document(**document_data.model_dump(), hash=doc_hash)
+        db.add(new_doc)
+        await db.flush()
+        await db.refresh(new_doc)
+        return new_doc
+
+    @staticmethod
+    async def get_all(db: AsyncSession) -> list[Document]:
+        """Fetch all documents."""
+        result = await db.execute(select(Document))
+        return list(result.scalars().all())
 
 
     @staticmethod
-    async def validate_file(content_type: str,path:str|Path):
-        match content_type:
-            case "text/plain":
-                return TextParser.parse(path)
-            case "application/pdf":
-                return await LLamaParser.parse(path)
-            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                return await LLamaParser.parse(path)
-            case _:
-                raise ValueError(f"Unsupported file type: {content_type}. Only TXT, PDF, and DOCX are allowed.")
-
- 
-    @staticmethod
-    def upload_file(file_data):
-        # Logic to upload file
-        pass
+    async def get_by_id(db: AsyncSession, document_id: UUID, supabase: AsyncClient) -> Document:
+        """Fetch a single document by ID."""
+        result = await db.execute(select(Document).where(Document.id == document_id))
+        document = result.scalar_one_or_none()
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID {document_id} not found.",
+            )
+        document.signed_url = await DocumentCRUD._generate_signed_url(supabase, str(document.hash))
+        return document
 
     @staticmethod
-    def get_file(file_id):
-        # Logic to retrieve file
-        pass
+    async def _generate_signed_url(supabase: AsyncClient, file_hash: str) -> str | None:
+        try:
+            res = await supabase.storage.from_("docs").create_signed_url(file_hash, 3600)  # 1 hour expiration
+            return res["signedURL"]
+        except Exception as e:
+            # Log the error, but don't fail the request if URL generation fails
+            print(f"Error generating signed URL for {file_hash}: {e}")
+            return None
 
 
-
-
-
-
-
+    @staticmethod
+    async def delete(db: AsyncSession, document_id: UUID) -> None:
+        """Delete a document by ID."""
+        result = await db.execute(select(Document).where(Document.id == document_id))
+        document = result.scalar_one_or_none()
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID {document_id} not found.",
+            )
+        await db.delete(document)
+        await db.flush()
 

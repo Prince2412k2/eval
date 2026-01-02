@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import os
 from dotenv import load_dotenv
 
@@ -16,15 +17,13 @@ class Settings:
         self.SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
         self.SUPABASE_URL = os.environ.get("SUPABASE_URL")
         self.SECRET_KEY = os.environ.get("SECRET_KEY")
-        self.GROQ_TRANSCRIPTION_URL: str = (
-            "https://api.groq.com/openai/v1/audio/transcriptions"
-        )
-        self.MAX_AUDIO_SIZE_MB: int = 10
-        self.MAX_AUDIO_DURATION_MIN: int = 20
 
+@dataclass
 class Defaults:
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     CHUNK_STRATEGY: Strategy = Strategy.SEMANTIC
+
+    BUCKET_NAME = "Documents"
 
 settings = Settings()  # pyright: ignore

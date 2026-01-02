@@ -5,9 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "asyncpg>=0.31.0",
   "dotenv>=0.9.9",
   "fastapi[standard]>=0.128.0",
+  "fastembed>=0.7.4",
   "llama-index>=0.14.12",
   "llama-parse>=0.6.54",
+  "qdrant-client>=1.16.2",
   "sqlalchemy>=2.0.45",
+  "supabase>=2.27.0",
 ]
