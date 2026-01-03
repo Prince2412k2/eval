@@ -1,6 +1,6 @@
 import hashlib
 from datetime import datetime
-from typing import List
+from typing import Iterable, List
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile, status
@@ -14,18 +14,21 @@ from app.core.config import Defaults
 from app.models import Document
 
 
+# Schema
 
-#Schema
 
 class DocumentBase(BaseModel):
     mime_type: str
     title: str = Field(..., min_length=1, max_length=255)
 
+
 class DocumentCreate(DocumentBase):
     pass
 
+
 class DocumentUpdate(BaseModel):
     title: str | None = Field(None, max_length=255)
+
 
 class DocumentRead(DocumentBase):
     id: UUID
@@ -36,13 +39,13 @@ class DocumentRead(DocumentBase):
     class Config:
         from_attributes = True
 
-#Services 
 
+# Services
 class SupabaseFileCRUD:
     @staticmethod
-    async def _hash_bytes(file:UploadFile) -> str:
+    async def _hash_bytes(file: UploadFile) -> str:
         await file.seek(0)
-        data=await file.read()
+        data = await file.read()
         return hashlib.sha256(data).hexdigest()
 
     @staticmethod
@@ -53,11 +56,7 @@ class SupabaseFileCRUD:
         return f"{file_hash[:2]}/{file_hash}{ext}"
 
     @staticmethod
-    async def create(
-        file:UploadFile,
-        file_hash:str
-    ) -> dict:
-        supabase=await get_supabase()
+    async def create(file: UploadFile, file_hash: str, supabase: AsyncClient) -> dict:
         try:
             await file.seek(0)
             content = await file.read()
@@ -66,11 +65,12 @@ class SupabaseFileCRUD:
             res = await supabase.storage.from_(Defaults.BUCKET_NAME).upload(
                 path=file_hash,
                 file=content,
-            file_options={
-                "content-type": content_type,
-                "cache-control": "3600",
-                "upsert": "true",
-            },)
+                file_options={
+                    "content-type": content_type,
+                    "cache-control": "3600",
+                    "upsert": "true",
+                },
+            )
 
             if isinstance(res, dict) and res.get("error"):
                 raise RuntimeError(res["error"]["message"])
@@ -86,7 +86,7 @@ class SupabaseFileCRUD:
 
     @staticmethod
     async def read(path: str) -> bytes:
-        supabase=await get_supabase()
+        supabase = await get_supabase()
         try:
             return await supabase.storage.from_(Defaults.BUCKET_NAME).download(path)
         except Exception as e:
@@ -94,7 +94,7 @@ class SupabaseFileCRUD:
 
     @staticmethod
     async def delete(path: str) -> None:
-        supabase=await get_supabase()
+        supabase = await get_supabase()
         try:
             res = await supabase.storage.from_(Defaults.BUCKET_NAME).remove([path])
             if isinstance(res, dict) and res.get("error"):
@@ -104,8 +104,7 @@ class SupabaseFileCRUD:
 
     @staticmethod
     async def listall(prefix: str = "") -> List[dict]:
-
-        supabase=await get_supabase()
+        supabase = await get_supabase()
         try:
             return await supabase.storage.from_(Defaults.BUCKET_NAME).list(prefix)
         except Exception as e:
@@ -119,6 +118,7 @@ class SupabaseFileCRUD:
         except Exception:
             return False
 
+
 class DocumentCRUD:
     @staticmethod
     async def create(
@@ -129,6 +129,7 @@ class DocumentCRUD:
         new_doc = Document(**document_data.model_dump(), hash=doc_hash)
         db.add(new_doc)
         await db.flush()
+        await db.commit()
         await db.refresh(new_doc)
         return new_doc
 
@@ -138,30 +139,40 @@ class DocumentCRUD:
         result = await db.execute(select(Document))
         return list(result.scalars().all())
 
+    @staticmethod
+    async def get_by_ids(
+        db: AsyncSession,
+        ids: Iterable[str],
+    ) -> list[Document]:
+        if not ids:
+            return []
+
+        result = await db.execute(select(Document).where(Document.hash.in_(ids)))
+        return list(result.scalars().all())
 
     @staticmethod
-    async def get_by_id(db: AsyncSession, document_id: UUID, supabase: AsyncClient) -> Document:
-        """Fetch a single document by ID."""
-        result = await db.execute(select(Document).where(Document.id == document_id))
-        document = result.scalar_one_or_none()
-        if not document:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Document with ID {document_id} not found.",
-            )
-        document.signed_url = await DocumentCRUD._generate_signed_url(supabase, str(document.hash))
-        return document
+    async def generate_signed_urls(
+        supabase: AsyncClient,
+        file_hashes: Iterable[str],
+        names: Iterable[str],
+        expires_in: int = 3600,  # 1 hour
+    ) -> dict[str, str | None]:
+        results: dict[str, str | None] = {}
 
-    @staticmethod
-    async def _generate_signed_url(supabase: AsyncClient, file_hash: str) -> str | None:
-        try:
-            res = await supabase.storage.from_("docs").create_signed_url(file_hash, 3600)  # 1 hour expiration
-            return res["signedURL"]
-        except Exception as e:
-            # Log the error, but don't fail the request if URL generation fails
-            print(f"Error generating signed URL for {file_hash}: {e}")
-            return None
+        for file_hash, name in zip(file_hashes, names):
+            try:
+                res = await supabase.storage.from_(
+                    Defaults.BUCKET_NAME
+                ).create_signed_url(
+                    file_hash,
+                    expires_in,
+                )
+                results[name] = res.get("signedURL")
+            except Exception as e:
+                # log but do not fail batch
+                print(f"Error generating signed URL for {file_hash}: {e}")
 
+        return results
 
     @staticmethod
     async def delete(db: AsyncSession, document_id: UUID) -> None:
@@ -174,5 +185,5 @@ class DocumentCRUD:
                 detail=f"Document with ID {document_id} not found.",
             )
         await db.delete(document)
+        await db.commit()
         await db.flush()
-

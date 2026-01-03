@@ -33,4 +33,3 @@ async def get_groq() -> AsyncGroq:
     if groq.client is None:
         raise ValueError("Groq client not initialized.")
     return groq.client
-

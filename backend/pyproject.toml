@@ -9,6 +9,7 @@ dependencies = [
   "dotenv>=0.9.9",
   "fastapi[standard]>=0.128.0",
   "fastembed>=0.7.4",
+  "groq>=1.0.0",
   "llama-index>=0.14.12",
   "llama-parse>=0.6.54",
   "qdrant-client>=1.16.2",
