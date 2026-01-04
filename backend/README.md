@@ -9,3 +9,17 @@
 - For documents parsed page-by-page, page boundaries are treated as soft constraints rather than strict limits. If a sentence or paragraph spans multiple pages, the system does not forcibly split it at the page break. Instead, text is merged based on paragraph structure and heading continuity. This prevents semantic fragmentation, which would otherwise degrade embedding quality and downstream question-answering performance.
 
 - Overall, this strategy ensures that chunks remain semantically meaningful, retrieval-friendly, and traceable back to their source pages. It supports accurate grounding in responses while maintaining flexibility across different document formats and layouts, making it well-suited for a robust RAG pipeline.
+
+# Re-Ranking Strategy
+
+The system implements a custom re-ranking algorithm that improves upon pure vector similarity search. After retrieving initial candidates from the vector database, chunks are re-scored using a weighted combination of four factors:
+
+- **Similarity (50%)**: Cosine similarity from vector search
+- **Recency (20%)**: Newer documents are boosted over older versions
+- **Hierarchy (20%)**: Important sections (Definitions, Overview, Policy Rules) receive higher scores
+- **Adjacency (10%)**: Chunks with neighbors in the result set are boosted for contextual continuity
+
+This multi-factor approach ensures that the most contextually relevant and useful chunks are surfaced for policy question-answering, not just those with the highest semantic similarity.
+
+For detailed information about the reranking implementation, scoring components, and configuration options, see [RERANKING.md](./RERANKING.md).
+

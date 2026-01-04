@@ -4,15 +4,15 @@
 
 ## PHASE 0 — Setup (30 min | 5 pts)
 
-- [ ] Create repo structure
-  - [ ] `backend/`
-  - [ ] `frontend/`
+- [x] Create repo structure
+  - [x] `backend/`
+  - [x] `frontend/`
 
-- [ ] Add Dockerfiles (backend + frontend)
-- [ ] Create `docker-compose.yml`
-- [ ] Add `.env.example`
-- [ ] Create `README.md` skeleton with headings
-- [ ] Choose stack (document clearly)
+- [x] Add Dockerfiles (backend + frontend)
+- [x] Create `docker-compose.yml`
+- [x] Add `.env.example`
+- [x] Create `README.md` skeleton with headings
+- [x] Choose stack (document clearly)
 
 ---
 
@@ -20,45 +20,45 @@
 
 ### File Processing
 
-- [ ] Upload & parse:
-  - [ ] PDF
-  - [ ] DOCX
-  - [ ] TXT
+- [x] Upload & parse:
+  - [x] PDF
+  - [x] DOCX
+  - [x] TXT
 
-- [ ] Extract:
-  - [ ] text
-  - [ ] page numbers
-  - [ ] headings / sections
-  - [ ] lists
-  - [ ] tables
+- [x] Extract:
+  - [x] text
+  - [x] page numbers
+  - [x] headings / sections
+  - [x] lists
+  - [x] tables
 
 ---
 
 ### Chunking Strategy A — Sliding Window
 
-- [ ] Implement fixed-size chunks
-- [ ] Add overlap
-- [ ] Make chunk size configurable
+- [x] Implement fixed-size chunks
+- [x] Add overlap
+- [x] Make chunk size configurable
 
 ---
 
 ### Chunking Strategy B — Semantic Chunking
 
-- [ ] Detect section headers
-- [ ] Keep headers + first paragraph together
-- [ ] Keep numbered lists intact
-- [ ] Treat tables as atomic chunks
-- [ ] Avoid splitting policy rules across pages
+- [x] Detect section headers
+- [x] Keep headers + first paragraph together
+- [x] Keep numbered lists intact
+- [x] Treat tables as atomic chunks
+- [x] Avoid splitting policy rules across pages
 
 ---
 
 ### Metadata (CRITICAL)
 
-- [ ] Store for every chunk:
-  - [ ] document_id
-  - [ ] page_numbers
-  - [ ] section_hierarchy
-  - [ ] chunk_index
+- [x] Store for every chunk:
+  - [x] document_id
+  - [x] page_numbers
+  - [x] section_hierarchy
+  - [x] chunk_index
 
 ---
 
@@ -66,15 +66,15 @@
 
 ### Retrieval
 
-- [ ] Embed chunks
-- [ ] Store in vector DB
-- [ ] Implement semantic search
+- [x] Embed chunks
+- [x] Store in vector DB
+- [x] Implement semantic search
 
 ---
 
 ### Custom Re-Ranking (MANDATORY)
 
-- [ ] Implement scoring:
+- [x] Implement scoring:
 
   ```
   final_score =
@@ -84,18 +84,18 @@
     adjacency * W4
   ```
 
-- [ ] Recency boost (newer > older)
-- [ ] Section bonus (Definitions / Overview)
-- [ ] Adjacent chunk boost (±1 chunk)
+- [x] Recency boost (newer > older)
+- [x] Section bonus (Definitions / Overview)
+- [x] Adjacent chunk boost (±1 chunk)
 
 ---
 
 ### Context Window Management
 
-- [ ] Enforce token budget
-- [ ] Select best subset of chunks
-- [ ] Avoid redundant info
-- [ ] Include adjacent chunks if needed
+- [x] Enforce token budget
+- [x] Select best subset of chunks
+- [x] Avoid redundant info
+- [x] Include adjacent chunks if needed
 
 ---
 
