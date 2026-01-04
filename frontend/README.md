@@ -1,73 +1,99 @@
-# React + TypeScript + Vite
+# Policy Chatbot Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Beautiful, minimal frontend for the Policy Chatbot with streaming responses, citations, and conversation history.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- ✨ **Streaming Responses**: Real-time token-by-token streaming from the LLM
+- 📚 **Citations Display**: Shows source citations with document name, page, section, and text spans
+- 📄 **Source Documents**: Links to original policy documents
+- 💬 **Conversation Continuity**: Maintains conversation context across messages
+- 🎨 **Modern UI**: Glassmorphism effects, gradient backgrounds, smooth animations
+- 📱 **Responsive**: Works on desktop and mobile
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19
+- TypeScript
+- Tailwind CSS v4
+- Vite
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Install Dependencies
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Run Development Server
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+The app will be available at `http://localhost:5173`
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+## API Integration
+
+The frontend connects to the backend API at `http://localhost:8000`:
+
+- `POST /api/query` - Send queries and receive streaming responses
+- `GET /api/conversations/{id}` - Get conversation history
+- `DELETE /api/conversations/{id}` - Delete conversation
+
+## Features Breakdown
+
+### Streaming Chat Interface
+
+- Real-time message streaming using Server-Sent Events (SSE)
+- Smooth animations for message appearance
+- Auto-scroll to latest message
+
+### Citations Display
+
+Each assistant response includes:
+- Document name and page number
+- Section hierarchy
+- Text span (50-200 chars from source)
+- Citation type (direct quote, paraphrase, inference)
+
+### Conversation Management
+
+- Automatic conversation creation on first message
+- Conversation ID tracking for follow-up questions
+- Context maintained across messages
+
+## Customization
+
+### Colors
+
+Edit the gradient in `App.css`:
+
+```css
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+```
+
+### API Endpoint
+
+Change the API URL in `App.tsx`:
+
+```typescript
+const response = await fetch('http://localhost:8000/api/query', {
+  // ...
+});
+```
+
+## Future Enhancements
+
+- Conversation history sidebar
+- Document upload UI
+- Dark/light mode toggle
+- Export conversation
+- Citation verification UI
