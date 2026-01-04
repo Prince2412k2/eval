@@ -12,6 +12,7 @@ from app.core.llamaindex import LlamaIndex, init_llama
 from app.routes.upload import upload_router
 from app.routes.query import query_router
 from app.routes.verify import verify_router
+from app.routes.conversation import conversation_router
 
 
 @asynccontextmanager
@@ -38,3 +39,4 @@ app.add_middleware(
 app.include_router(upload_router, prefix="/api/upload")
 app.include_router(query_router, prefix="/api/query")
 app.include_router(verify_router, prefix="/api")
+app.include_router(conversation_router, prefix="/api/conversations")
