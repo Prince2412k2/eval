@@ -1,5 +1,6 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List, Dict
 from groq import AsyncGroq
+import json
 
 RAG_PROMPT = """
 You are an intelligent and helpful AI assistant. Your goal is to provide accurate and concise answers based *only* on the provided context.
@@ -42,3 +43,50 @@ class QueryService:
             content = delta.content or ""
             if content:
                 yield content
+    
+    @staticmethod
+    async def extract_citations_structured(
+        query: str,
+        chunks: List[Dict],
+        groq: AsyncGroq
+    ) -> List[Dict]:
+        """
+        Use fast LLM to extract structured citations from context chunks.
+        
+        Args:
+            query: User's question
+            chunks: Context chunks to extract citations from
+            groq: Groq client
+            
+        Returns:
+            List of citation dicts with chunk_index, text_span, claim_text, citation_type
+        """
+        from app.service.citation_service import CitationService
+        
+        # Build prompt for citation extraction
+        prompt = CitationService.build_citation_extraction_prompt(query, chunks)
+        
+        try:
+            # Use fast model with JSON mode for structured output
+            resp = await groq.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.1-8b-instant",  # Fast & cheap model
+                response_format={"type": "json_object"},  # Structured JSON output
+                temperature=0.1,  # Low temperature for consistency
+            )
+            
+            # Parse JSON response
+            content = resp.choices[0].message.content
+            citations_data = json.loads(content)
+            
+            # Return citations array
+            return citations_data.get("citations", [])
+            
+        except json.JSONDecodeError as e:
+            # Fallback: return empty list if JSON parsing fails
+            print(f"Citation extraction JSON parse error: {e}")
+            return []
+        except Exception as e:
+            # Catch any other errors
+            print(f"Citation extraction error: {e}")
+            return []

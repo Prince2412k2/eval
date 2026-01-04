@@ -103,26 +103,26 @@
 
 ### Citation System
 
-- [ ] Each claim has citation:
-  - [ ] document name
-  - [ ] page number
-  - [ ] section
-  - [ ] 50–200 char text span
+- [x] Each claim has citation:
+  - [x] document name
+  - [x] page number
+  - [x] section
+  - [x] 50–200 char text span
 
-- [ ] Mark citation type:
-  - [ ] direct quote
-  - [ ] paraphrase
-  - [ ] inference
+- [x] Mark citation type:
+  - [x] direct quote
+  - [x] paraphrase
+  - [x] inference
 
 ---
 
 ### Verification API
 
-- [ ] `POST /api/verify-citation`
-- [ ] Return:
-  - [ ] source text
-  - [ ] context
-  - [ ] confidence score
+- [x] `POST /api/verify-citation`
+- [x] Return:
+  - [x] source text
+  - [x] context
+  - [x] confidence score
 
 ---
 

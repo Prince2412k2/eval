@@ -23,3 +23,31 @@ This multi-factor approach ensures that the most contextually relevant and usefu
 
 For detailed information about the reranking implementation, scoring components, and configuration options, see [RERANKING.md](./RERANKING.md).
 
+# Citations & Verification
+
+The system provides transparent source attribution for every claim made by the LLM using a dual-LLM approach:
+
+**Citation Extraction** (Parallel):
+- Model: `llama-3.1-8b-instant` (fast & cheap)
+- Output: Structured JSON with citations
+- Runs in parallel with main response for minimal latency
+
+**Citation Types**:
+- **Direct Quote**: Exact wording from source
+- **Paraphrase**: Restated information maintaining meaning
+- **Inference**: Logical conclusion drawn from source
+
+**Verification API**:
+- `POST /api/verify-citation`: Verify citation accuracy
+- Returns source text, context, and confidence score (0.0-1.0)
+
+Each citation includes:
+- Document name and ID
+- Page number and section
+- Text span (50-200 chars from source)
+- Claim text and citation type
+- Confidence score
+
+For detailed information about the citations system, API endpoints, and integration, see [CITATIONS.md](./CITATIONS.md).
+
+
