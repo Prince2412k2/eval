@@ -280,231 +280,269 @@ function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen bg-[var(--color-bg-primary)]">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-80' : 'w-0'} bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)] flex flex-col transition-all duration-300 ease-in-out overflow-hidden shrink-0`}>
-        <div className="p-4 border-b border-[var(--color-border)]">
-          <button 
-            onClick={startNewChat} 
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm mb-3"
-          >
-            <Plus size={18} />
-            New Chat
-          </button>
-          <div className="flex gap-2">
-            <button 
-              onClick={toggleDarkMode} 
-              className="flex-1 p-2.5 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-hover)] transition-colors flex items-center justify-center"
-              aria-label="Toggle theme"
+      <aside className={`
+        relative border-r border-[var(--border-color)] bg-[var(--bg-secondary)] 
+        flex flex-col transition-all duration-300 ease-in-out shrink-0 z-20 
+        ${sidebarOpen ? 'w-[320px]' : 'w-0'}
+      `}>
+        <div className="flex flex-col h-full overflow-hidden">
+          <div className="p-6 border-b border-[var(--border-color)]">
+            <button
+              onClick={startNewChat}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all font-semibold text-sm mb-4 shadow-sm"
             >
-              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+              <Plus size={18} strokeWidth={3} />
+              New Chat
             </button>
-            <button 
-              onClick={() => setSidebarOpen(false)} 
-              className="flex-1 p-2.5 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-hover)] transition-colors flex items-center justify-center"
-              aria-label="Collapse sidebar"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 scrollbar-none [&::-webkit-scrollbar]:hidden">
-          {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-[var(--color-text-tertiary)] px-4">
-              <MessageSquare size={40} opacity={0.3} className="mb-3" />
-              <p className="text-sm text-center">No conversations yet</p>
-            </div>
-          ) : (
-            conversations.map(conv => (
-              <div
-                key={conv.id}
-                className={`p-3 mb-2 rounded-lg cursor-pointer transition-all flex items-start justify-between group ${
-                  conversationId === conv.id 
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
-                    : 'hover:bg-[var(--color-bg-hover)] border border-transparent'
-                }`}
-                onClick={() => loadConversation(conv.id)}
+            <div className="flex gap-3">
+              <button
+                onClick={toggleDarkMode}
+                className="flex-1 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                aria-label="Toggle theme"
               >
-                <div className="flex-1 min-w-0 pr-2">
-                  <div className="text-sm font-medium text-[var(--color-text-primary)] truncate mb-1">
-                    {conv.title || 'New Chat'}
-                  </div>
-                  <div className="text-xs text-[var(--color-text-tertiary)]">
-                    {conv.message_count} {conv.message_count === 1 ? 'message' : 'messages'}
-                  </div>
-                </div>
-                <button
-                  className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-all shrink-0"
-                  onClick={(e) => deleteConversation(conv.id, e)}
-                  title="Delete conversation"
-                >
-                  <Trash2 size={14} className="text-red-600 dark:text-red-400" />
-                </button>
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="flex-1 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                aria-label="Collapse sidebar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-hide">
+            {conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-[var(--text-tertiary)] px-4">
+                <MessageSquare size={48} opacity={0.3} className="mb-4" />
+                <p className="text-sm font-medium text-center">No history yet</p>
               </div>
-            ))
-          )}
+            ) : (
+              <div className="space-y-3">
+                {conversations.map(conv => (
+                  <div
+                    key={conv.id}
+                    className={`
+                      relative p-4 rounded-xl cursor-pointer transition-all border group
+                      ${conversationId === conv.id
+                        ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
+                        : 'bg-transparent border-transparent hover:bg-[var(--bg-hover)]'
+                      }
+                    `}
+                    onClick={() => loadConversation(conv.id)}
+                  >
+                    <div className="flex-1 min-w-0 pr-8">
+                      <div className="text-sm font-semibold text-[var(--text-primary)] truncate mb-1">
+                        {conv.title || 'Untitled Chat'}
+                      </div>
+                      <div className="text-xs text-[var(--text-tertiary)] font-medium">
+                        {conv.message_count} {conv.message_count === 1 ? 'message' : 'messages'}
+                      </div>
+                    </div>
+                    <button
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all text-red-500"
+                      onClick={(e) => deleteConversation(conv.id, e)}
+                      title="Delete conversation"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
-      {/* Toggle Button */}
-      {!sidebarOpen && (
-        <button
-          className="fixed top-4 left-4 z-50 p-3 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg shadow-lg hover:bg-[var(--color-bg-hover)] hover:scale-105 transition-all"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open sidebar"
-        >
-          <Menu size={20} />
-        </button>
-      )}
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col relative min-w-0 h-full">
+        {/* Mobile-style Toggle */}
+        {!sidebarOpen && (
+          <button
+            className="absolute top-6 left-6 z-30 p-3 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl shadow-lg hover:bg-[var(--bg-hover)] active:scale-95 transition-all text-[var(--text-primary)]"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
+          >
+            <Menu size={20} />
+          </button>
+        )}
 
-      {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-none [&::-webkit-scrollbar]:hidden">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <div className="text-6xl mb-6">💬</div>
-              <h2 className="text-3xl font-bold text-[var(--color-text-primary)] mb-3">How can I help you today?</h2>
-              <p className="text-base text-[var(--color-text-secondary)] max-w-md">Ask any question about your policy documents and I'll provide detailed answers with citations.</p>
-            </div>
-          ) : (
-            <div className="max-w-4xl mx-auto space-y-6">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {message.role === 'assistant' && (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-                      <Bot size={18} className="text-white" />
+        <main className="flex-1 flex flex-col h-full bg-[var(--bg-primary)] px-6 py-12">
+          <div className="flex-1 overflow-y-auto scrollbar-hide py-6">
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center">
+                <div className="w-24 h-24 bg-blue-500/10 rounded-3xl flex items-center justify-center mb-10 animate-bounce-slow">
+                  <Bot size={48} className="text-blue-500" />
+                </div>
+                <h1 className="text-4xl font-extrabold text-[var(--text-primary)] mb-4 tracking-tight">
+                  How can I help you?
+                </h1>
+                <p className="text-lg text-[var(--text-secondary)] leading-relaxed font-medium">
+                  I'm your AI assistant, ready to help you analyze policy documents, extract insights, and answer questions with citations.
+                </p>
+                <div className="grid grid-cols-2 gap-4 mt-12 w-full max-w-lg">
+                  {['Summarize my documents', 'Extract key terms', 'Find citation policy', 'Verify coverage'].map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setInput(item)}
+                      className="p-4 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:border-blue-400 hover:text-blue-500 transition-all text-left shadow-sm"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-4xl mx-auto flex flex-col gap-10">
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex items-start gap-5 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                  >
+                    <div className={`
+                      w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm
+                      ${message.role === 'assistant'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }
+                    `}>
+                      {message.role === 'assistant' ? <Bot size={22} /> : <User size={22} />}
                     </div>
-                  )}
 
-                  <div className={`flex-1 max-w-3xl ${message.role === 'user' ? 'flex justify-end' : ''}`}>
-                    <div className="mb-1.5 flex items-center gap-2">
-                      <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                        {message.role === 'user' ? 'You' : 'Assistant'}
-                      </span>
-                      {message.timestamp && (
-                        <span className="text-xs text-[var(--color-text-tertiary)]">
-                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div className={`flex flex-col gap-2 max-w-[85%] ${message.role === 'user' ? 'items-end' : ''}`}>
+                      <div className="flex items-center gap-2 px-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+                          {message.role === 'assistant' ? 'Assistant' : 'You'}
                         </span>
-                      )}
-                    </div>
-
-                    <div className={`rounded-2xl px-4 py-3 ${
-                      message.role === 'user' 
-                        ? 'bg-blue-500 text-white inline-block' 
-                        : 'bg-[var(--color-bg-message-assistant)] border border-[var(--color-border)]'
-                    }`}>
-                      <div className={`text-[15px] leading-relaxed ${message.role === 'assistant' ? 'prose prose-sm dark:prose-invert max-w-none' : ''}`}>
-                        {message.role === 'assistant' ? (
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {message.content}
-                          </ReactMarkdown>
-                        ) : (
-                          message.content
+                        {message.timestamp && (
+                          <span className="text-[10px] text-[var(--text-tertiary)]">
+                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         )}
                       </div>
 
-                      {message.citations && message.citations.length > 0 && (
-                        <details className="mt-4 group/details">
-                          <summary className="flex items-center gap-2 text-sm cursor-pointer text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors list-none">
-                            <FileText size={14} />
-                            <span className="font-medium">{message.citations.length} {message.citations.length === 1 ? 'citation' : 'citations'}</span>
-                            <ChevronDown size={14} className="group-open/details:rotate-180 transition-transform" />
-                          </summary>
-                          <div className="mt-3 space-y-2">
-                            {message.citations.map((citation, idx) => (
-                              <div key={idx} className="flex gap-3 p-3 bg-[var(--color-bg-citation)] rounded-lg text-sm border border-[var(--color-border)]">
-                                <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold shrink-0">
-                                  {idx + 1}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  {citation.document_url ? (
-                                    <a
-                                      href={`${citation.document_url}#page=${citation.page_number}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 dark:text-blue-400 hover:underline font-medium block mb-1"
-                                    >
-                                      {citation.document_name} • Page {citation.page_number}
-                                    </a>
-                                  ) : (
-                                    <div className="font-medium text-[var(--color-text-primary)] mb-1">
-                                      {citation.document_name} • Page {citation.page_number}
+                      <div className={`
+                        relative px-6 py-4 rounded-3xl shadow-sm text-[15px] leading-[1.6]
+                        ${message.role === 'user'
+                          ? 'bg-blue-500 text-white rounded-tr-none'
+                          : 'bg-[var(--bg-message-assistant)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-tl-none'
+                        }
+                      `}>
+                        <div className={message.role === 'assistant' ? 'prose prose-sm dark:prose-invert max-w-none' : ''}>
+                          {message.role === 'assistant' ? (
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {message.content}
+                            </ReactMarkdown>
+                          ) : (
+                            <p className="whitespace-pre-wrap">{message.content}</p>
+                          )}
+                        </div>
+
+                        {message.citations && message.citations.length > 0 && (
+                          <div className="mt-6 pt-4 border-t border-[var(--border-color)]/30">
+                            <details className="group/details">
+                              <summary className="flex items-center gap-2 text-xs font-bold cursor-pointer text-blue-500 hover:text-blue-600 transition-colors list-none uppercase tracking-widest">
+                                <FileText size={16} strokeWidth={2.5} />
+                                <span>{message.citations.length} Ref{message.citations.length === 1 ? 'erence' : 'erences'}</span>
+                                <ChevronDown size={14} className="group-open/details:rotate-180 transition-transform ml-auto" />
+                              </summary>
+                              <div className="mt-4 space-y-3">
+                                {message.citations.map((citation, idx) => (
+                                  <div key={idx} className="flex gap-4 p-4 bg-[var(--bg-citation)] rounded-2xl border border-[var(--border-color)] group/item hover:border-blue-200 transition-colors shadow-sm">
+                                    <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-xs font-black shrink-0">
+                                      {idx + 1}
                                     </div>
-                                  )}
-                                  <div className="text-[var(--color-text-secondary)] italic">"{citation.text_span}"</div>
-                                </div>
+                                    <div className="flex-1 min-w-0">
+                                      <a
+                                        href={citation.document_url ? `${citation.document_url}#page=${citation.page_number}` : '#'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs font-bold text-[var(--text-primary)] hover:text-blue-500 transition-colors block mb-1.5"
+                                      >
+                                        {citation.document_name} • Page {citation.page_number}
+                                      </a>
+                                      <div className="text-[13px] text-[var(--text-secondary)] italic font-medium leading-normal line-clamp-3">
+                                        "{citation.text_span}"
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
+                            </details>
+                          </div>
+                        )}
+
+                        {message.sources && message.sources.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {message.sources.map((source, idx) => (
+                              <a
+                                key={idx}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-500 rounded-lg text-[11px] font-bold uppercase tracking-wider hover:bg-blue-500/20 transition-all border border-blue-500/20"
+                              >
+                                📄 {source.name}
+                              </a>
                             ))}
                           </div>
-                        </details>
-                      )}
-
-                      {message.sources && message.sources.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {message.sources.map((source, idx) => (
-                            <a
-                              key={idx}
-                              href={source.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                            >
-                              📄 {source.name}
-                            </a>
-                          ))}
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  {message.role === 'user' && (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center shrink-0 shadow-sm">
-                      <User size={18} className="text-white" />
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Input Area */}
-        <footer className="border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-4">
-          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-            <div className="flex gap-3 items-end">
-              <div className="flex-1">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit(e as any);
-                    }
-                  }}
-                  placeholder="Ask a question..."
-                  className="w-full px-4 py-3 bg-[var(--color-bg-input)] border border-[var(--color-border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] resize-none text-base"
-                  disabled={isLoading}
-                  rows={1}
-                  style={{ minHeight: '48px', maxHeight: '200px' }}
-                />
+                ))}
+                <div ref={messagesEndRef} className="h-4" />
               </div>
-              <button
-                type="submit"
-                className="px-5 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center shrink-0 h-12"
-                disabled={isLoading || !input.trim()}
+            )}
+          </div>
+
+          {/* Footer / Input */}
+          <footer className="w-full bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent pt-10 pb-8 px-6">
+            <div className="max-w-4xl mx-auto relative group">
+              <form
+                onSubmit={handleSubmit}
+                className="relative flex items-end bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[32px] p-2 pr-4 shadow-xl shadow-blue-500/5 focus-within:border-blue-400 transition-all group-hover:shadow-blue-500/10 focus-within:shadow-blue-500/15"
               >
-                {isLoading ? <div className="loading-spinner" /> : <Send size={20} />}
-              </button>
+                <div className="flex-1 relative">
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit(e as any);
+                      }
+                    }}
+                    placeholder="Ask a follow-up or a new question..."
+                    className="w-full max-h-[200px] min-h-[56px] pl-6 pr-4 py-4 bg-transparent border-none focus:ring-0 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none text-[16px] scrollbar-hide"
+                    disabled={isLoading}
+                    rows={1}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="mb-1 w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 transition-all shadow-md active:scale-95 disabled:scale-100 disabled:shadow-none"
+                  disabled={isLoading || !input.trim()}
+                >
+                  {isLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Send size={18} strokeWidth={3} />
+                  )}
+                </button>
+              </form>
+              <div className="mt-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                  AI-generated answers. Verify critical information.
+                </p>
+              </div>
             </div>
-          </form>
-        </footer>
-      </main>
+          </footer>
+        </main>
+      </div>
     </div>
   );
 }

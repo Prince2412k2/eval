@@ -81,7 +81,7 @@ body,
 
 .scrollbar-hide {
   -ms-overflow-style: none;
-  land scrollbar-width: none;
+  scrollbar-width: none;
 }
 
 /* Transition for theme switching */
