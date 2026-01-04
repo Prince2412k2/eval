@@ -13,6 +13,8 @@ from app.routes.upload import upload_router
 from app.routes.query import query_router
 from app.routes.verify import verify_router
 from app.routes.conversation import conversation_router
+from app.routes.documents import documents_router
+from app.routes.admin import admin_router
 
 
 @asynccontextmanager
@@ -30,7 +32,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
+    allow_origins=["http://localhost:8080", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,3 +42,5 @@ app.include_router(upload_router, prefix="/api/upload")
 app.include_router(query_router, prefix="/api/query")
 app.include_router(verify_router, prefix="/api")
 app.include_router(conversation_router, prefix="/api/conversations")
+app.include_router(documents_router, prefix="/api/admin")
+app.include_router(admin_router, prefix="/api/admin")

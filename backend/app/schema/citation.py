@@ -17,6 +17,7 @@ class Citation(BaseModel):
     Attributes:
         document_name: Human-readable document name
         document_id: Document hash/ID for lookup
+        document_url: Optional URL to the source document.
         page_number: Page number in source document
         section: Section name/hierarchy (e.g., "Returns and Refunds")
         text_span: Exact text from source (50-200 chars)
@@ -27,6 +28,7 @@ class Citation(BaseModel):
     """
     document_name: str
     document_id: str
+    document_url: Optional[str] = None
     page_number: int
     section: Optional[str] = None
     text_span: str = Field(..., min_length=10, max_length=300)

@@ -90,8 +90,9 @@ async def ask(
         supabase, file_hashes=sources_hash, names=names
     )
 
-    # Step 7: Create document name mapping for citations
+    # Step 7: Create document name and URL mapping for citations
     doc_name_map = {doc.hash: doc.title for doc in docs}
+    doc_url_map = sources  # sources is already {name: url} dict
     chunk_map = {i: chunk for i, chunk in enumerate(final_chunks)}
 
     # Step 8: Define citation extraction task (runs in parallel)
@@ -119,6 +120,7 @@ async def ask(
                         document_name=doc_name,
                         text_span=raw_cit.get("text_span"),
                         confidence_score=1.0,
+                        document_url=doc_url_map.get(doc_name)
                     )
                     citations.append(citation)
             return citations

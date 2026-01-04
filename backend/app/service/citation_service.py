@@ -13,7 +13,8 @@ class CitationService:
         citation_type: CitationType,
         document_name: str,
         text_span: Optional[str] = None,
-        confidence_score: float = 1.0
+        confidence_score: float = 1.0,
+        document_url: Optional[str] = None
     ) -> Citation:
         """
         Create a Citation object from chunk metadata and claim information.
@@ -49,6 +50,7 @@ class CitationService:
         return Citation(
             document_name=document_name,
             document_id=chunk.get('document_id', 'unknown'),
+            document_url=document_url,
             page_number=chunk.get('page', 0),
             section=section,
             text_span=text_span,

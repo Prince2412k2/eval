@@ -12,32 +12,7 @@ from app.core.supabase import get_supabase
 
 from app.core.config import Defaults
 from app.models import Document
-
-
-# Schema
-
-
-class DocumentBase(BaseModel):
-    mime_type: str
-    title: str = Field(..., min_length=1, max_length=255)
-
-
-class DocumentCreate(DocumentBase):
-    pass
-
-
-class DocumentUpdate(BaseModel):
-    title: str | None = Field(None, max_length=255)
-
-
-class DocumentRead(DocumentBase):
-    id: UUID
-    created_at: datetime
-    hash: str
-    signed_url: str | None = None
-
-    class Config:
-        from_attributes = True
+from app.schema.document import DocumentCreate, DocumentUpdate, DocumentRead
 
 
 # Services
@@ -128,10 +103,41 @@ class DocumentCRUD:
 
         new_doc = Document(**document_data.model_dump(), hash=doc_hash)
         db.add(new_doc)
-        await db.flush()
         await db.commit()
         await db.refresh(new_doc)
         return new_doc
+
+    @staticmethod
+    async def update_metadata(
+        db: AsyncSession,
+        doc_hash: str,
+        file_size: int | None = None,
+        page_count: int | None = None,
+        chunk_count: int | None = None,
+        status: str | None = None,
+    ) -> Document:
+        """Update document metadata after processing"""
+        result = await db.execute(select(Document).where(Document.hash == doc_hash))
+        document = result.scalar_one_or_none()
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with hash {doc_hash} not found",
+            )
+
+        if file_size is not None:
+            document.file_size = file_size
+        if page_count is not None:
+            document.page_count = page_count
+        if chunk_count is not None:
+            document.chunk_count = chunk_count
+        if status is not None:
+            document.status = status
+
+        await db.commit()
+        await db.refresh(document)
+        return document
+
 
     @staticmethod
     async def get_all(db: AsyncSession) -> list[Document]:
@@ -178,17 +184,3 @@ class DocumentCRUD:
                 print(f"Error generating signed URL for {file_hash}: {str(e)}")
 
         return results
-
-    @staticmethod
-    async def delete(db: AsyncSession, document_id: UUID) -> None:
-        """Delete a document by ID."""
-        result = await db.execute(select(Document).where(Document.id == document_id))
-        document = result.scalar_one_or_none()
-        if not document:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Document with ID {document_id} not found.",
-            )
-        await db.delete(document)
-        await db.commit()
-        await db.flush()

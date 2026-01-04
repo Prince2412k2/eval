@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from uuid import UUID
 from typing import List
 
@@ -10,8 +11,59 @@ from app.schema.conversation import (
     ConversationDetailResponse,
     MessageResponse
 )
+from app.models import Conversation, Message
 
 conversation_router = APIRouter()
+
+
+@conversation_router.get("/", response_model=List[ConversationResponse])
+async def list_conversations(
+    limit: int = 50,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all conversations with pagination.
+    
+    Args:
+        limit: Maximum number of conversations to return
+        offset: Number of conversations to skip
+        
+    Returns:
+        List of conversation summaries
+    """
+    # Get conversations with message count
+    query = (
+        select(
+            Conversation,
+            func.count(Message.id).label("message_count")
+        )
+        .outerjoin(Message, Conversation.id == Message.conversation_id)
+        .group_by(Conversation.id)
+        .order_by(Conversation.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    conversations = []
+    for conv, msg_count in rows:
+        conversations.append(
+            ConversationResponse(
+                id=conv.id,
+                title=conv.title,
+                created_at=conv.created_at,
+                updated_at=conv.updated_at,
+                documents_discussed=conv.documents_discussed or [],
+                topics_covered=conv.topics_covered or [],
+                message_count=msg_count or 0
+            )
+        )
+    
+    return conversations
+
 
 
 @conversation_router.get("/{conversation_id}", response_model=ConversationDetailResponse)
