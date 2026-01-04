@@ -1,106 +1,202 @@
+# Policy Chatbot – TODO Checklist
 
-# **Section A**
-## Task 1: Project Setup (5 points)
-- Docker Compose,
-- README
-- .env.example.
-- Your choice of stack (any backend, frontend, vector DB, LLM).
+---
 
-## Task 2: Intelligent Document Chunking (15 points)
+## PHASE 0 — Setup (30 min | 5 pts)
 
-- [x]  PDF, DOCX, and TXT support
+- [ ] Create repo structure
+  - [ ] `backend/`
+  - [ ] `frontend/`
 
-1. Implement TWO different chunking strategies (configurable):
-    - [x] Strategy A: Sliding window with overlap
-    - [x] Strategy B: Semantic boundary detection (paragraphs, sections, or sentences)
-    
-2. Handle these edge cases (we will test these):
-    - [x] A policy rule that spans across what would be a chunk boundary
-    - [x] Numbered lists where items reference each other (e.g., "See item 3 above")
-    - [x] Tables with multi-row cells
-    - [x]  Headers that must stay attached to their content
+- [ ] Add Dockerfiles (backend + frontend)
+- [ ] Create `docker-compose.yml`
+- [ ] Add `.env.example`
+- [ ] Create `README.md` skeleton with headings
+- [ ] Choose stack (document clearly)
 
-3. **Metadata preservation** - Each chunk must store: 
-- [x]  parent document ID
-- [x] page number(s)
-- [x] section hierarchy
-- [x] chunk's relative position.
+---
 
-4. **Written Requirement** (200-300 words in README): Why did you choose your chunking boundaries? What's the trade-off between chunk size and retrieval accuracy? How do you handle a sentence spanning two pages?
+## PHASE 1 — Document Ingestion & Chunking (1.5 hrs | 15 pts)
 
+### File Processing
 
-## Task 3: RAG Pipeline with Custom Ranking (20 points)
+- [ ] Upload & parse:
+  - [ ] PDF
+  - [ ] DOCX
+  - [ ] TXT
 
-1. **Basic Retrieval** (6 poi`nts)
-	- Implement semantic search with a vector database.
+- [ ] Extract:
+  - [ ] text
+  - [ ] page numbers
+  - [ ] headings / sections
+  - [ ] lists
+  - [ ] tables
 
-2.  **Custom Re-Ranking Logic** (8 points)
-	Your re-ranking must consider:
-    1. Recency Boost: Prefer chunks from more recently uploaded documents
-    2. Section Hierarchy Bonus: Boost "Definitions" or "Overview" sections for ambiguous queries
-    3. Adjacent Chunk Consideration: If chunk #5 is relevant, consider chunks #4 and #6 for context
-    4. Implement a scoring function: final_score = (similarity * W1) + (recency * W2) + (hierarchy * W3) + (adjacency * W4)
+---
 
-3. **Context Window Management** (6 points)
-- Problem: You retrieve 10 chunks totaling 8,000 tokens. Your LLM budget is 4,000 tokens.
-- Implement a function that returns the optimal subset maximizing information while fitting the budget. Consider: ranking score, diversity (don't repeat similar info), completeness (include adjacent chunks that complete thoughts).
-- How did you determine weights? What if top chunk (0.95 similarity) is 3 years old, but another (0.80 similarity) is from last week?
+### Chunking Strategy A — Sliding Window
 
-## Citation Extraction & Verification (12 points)
+- [ ] Implement fixed-size chunks
+- [ ] Add overlap
+- [ ] Make chunk size configurable
 
-- Citations must be verifiable and precise. We will test whether citations actually support claims made.
-    1. Citation granularity: Document name, page number, section, actual text span (50-200 chars)
-    2. Handle Synthesis: Answer combines info from 3 docs - each claim cites its specific source
-    3. Handle Inference: LLM makes logical inference - mark differently from direct quotes
-    4. Verification endpoint: /api/verify-citation returns source text, context, confidence score
-## Task 5: Conversation Management (8 points)
+---
 
-**Problem:** 20-message conversation exceeds token limits. Implement conversation summarization:
+### Chunking Strategy B — Semantic Chunking
 
-- Keep last N messages in full, summarize older messages
-    
-- Handle references to "what I asked earlier" when that message is summarized
-    
-- Track conversation state: documents discussed, topics covered, user preferences
+- [ ] Detect section headers
+- [ ] Keep headers + first paragraph together
+- [ ] Keep numbered lists intact
+- [ ] Treat tables as atomic chunks
+- [ ] Avoid splitting policy rules across pages
 
+---
 
+### Metadata (CRITICAL)
 
+- [ ] Store for every chunk:
+  - [ ] document_id
+  - [ ] page_numbers
+  - [ ] section_hierarchy
+  - [ ] chunk_index
 
+---
 
+## PHASE 2 — RAG + Custom Ranking (1.5 hrs | 20 pts)
 
-# **Section B**
+### Retrieval
 
+- [ ] Embed chunks
+- [ ] Store in vector DB
+- [ ] Implement semantic search
 
-### 6. edge cases
-#### Scenario 1: Redundant Information (3 points)
+---
 
-HR_Policy_2023.pdf says "15 days leave". HR_Policy_2024.pdf says "20 days leave". User asks: "How many days of leave?"
+### Custom Re-Ranking (MANDATORY)
 
-**Your system must:** Detect contradiction and redundancy, respond appropriately, NOT confidently state one answer.
+- [ ] Implement scoring:
 
-#### Scenario 2: Partial Information (3 points)
+  ```
+  final_score =
+    similarity * W1 +
+    recency * W2 +
+    hierarchy * W3 +
+    adjacency * W4
+  ```
 
-Documents have domestic travel limit ($500/day) but international travel only says "reasonable expenses".
+- [ ] Recency boost (newer > older)
+- [ ] Section bonus (Definitions / Overview)
+- [ ] Adjacent chunk boost (±1 chunk)
 
-**Your system must:** Acknowledge what IS known, state what ISN'T specified, NOT hallucinate a number.
+---
 
-#### Scenario 3: Out of Scope (2 points)
+### Context Window Management
 
-User asks: "What's the capital of France?"
+- [ ] Enforce token budget
+- [ ] Select best subset of chunks
+- [ ] Avoid redundant info
+- [ ] Include adjacent chunks if needed
 
-**Your system must:** Recognize not in documents, politely redirect to policy questions.
+---
 
-#### Scenario 4: Ambiguous Query (2 points)
+## PHASE 3 — Citations & Verification (1 hr | 12 pts)
 
-User asks: "What's the policy?"
+### Citation System
 
-**Your system must:** Recognize ambiguity, ask for clarification OR list available topics.
+- [ ] Each claim has citation:
+  - [ ] document name
+  - [ ] page number
+  - [ ] section
+  - [ ] 50–200 char text span
 
+- [ ] Mark citation type:
+  - [ ] direct quote
+  - [ ] paraphrase
+  - [ ] inference
 
-### 7.  Document Filtering Logic (10 points)
+---
 
-**1. Hierarchical Documents (3 points):** If v1 and v2 exist, v2 supersedes v1. Implement metadata flag: supersedes: [document IDs]
+### Verification API
 
-**2. Cross-Reference Detection (3 points):** Document A says "See IT Security Policy section 4.2". If user only queries A, detect the reference and ask/notify about including the referenced doc.
+- [ ] `POST /api/verify-citation`
+- [ ] Return:
+  - [ ] source text
+  - [ ] context
+  - [ ] confidence score
 
-**3. Conflict Detection (2 points):** Detect when a single document contradicts itself internally.
+---
+
+## PHASE 4 — Conversation Management (30 min | 8 pts)
+
+- [ ] Persist chat history
+- [ ] Keep last N messages verbatim
+- [ ] Summarize older messages
+- [ ] Track:
+  - [ ] documents discussed
+  - [ ] topics covered
+
+- [ ] Handle:
+  - [ ] “what I asked earlier…”
+
+---
+
+## PHASE 5 — Edge Cases & Safety (45 min | 20 pts)
+
+### Robustness Scenarios
+
+- [ ] Detect contradictory policies (v1 vs v2)
+- [ ] Handle partial info (say “not specified”)
+- [ ] Detect out-of-scope questions
+- [ ] Handle ambiguous queries
+
+---
+
+### Document Logic
+
+- [ ] Version superseding (`supersedes`)
+- [ ] Detect cross-references
+- [ ] Ask / notify before auto-including docs
+- [ ] Detect internal document contradictions
+
+---
+
+## PHASE 6 — Writing & Justification (45 min | 20 pts)
+
+### README / DESIGN.md
+
+- [ ] Chunking strategy explanation (200–300 words)
+- [ ] Re-ranking weights justification (150–200 words)
+- [ ] Citation handling explanation (100–150 words)
+- [ ] Cross-reference UX decision (100–150 words)
+- [ ] Embedding model choice
+- [ ] Chunk size trade-offs
+- [ ] DB schema description
+- [ ] Failure mode analysis
+
+---
+
+## ⭐ BONUS (Only If Time Left)
+
+- [ ] Streaming responses with citations
+- [ ] Semantic caching
+- [ ] Query decomposition
+- [ ] Feedback loop
+
+---
+
+## 🎯 FINAL SANITY CHECK (10 min)
+
+- [ ] System says “I don’t know” when unsure
+- [ ] Citations actually support answers
+- [ ] README explains **why**, not just **what**
+- [ ] No default-only logic
+
+---
+
+If you want next, I can:
+
+- Convert this into a **GitHub issue board**
+- Mark **absolute must-do vs nice-to-have**
+- Give you a **minimal 70-point survival plan**
+
+Just tell me how aggressive you want to be.

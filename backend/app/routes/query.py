@@ -32,24 +32,27 @@ async def ask(
     )
     merged_context = VectorService.format_context(contexts)
     sources_hash = VectorService.get_source_documents(contexts)
-    names = await DocumentCRUD.get_by_ids(db, sources_hash)
-    sources = await DocumentCRUD.generate_signed_urls(supabase, names, sources_hash)
+    docs = await DocumentCRUD.get_by_ids(db, sources_hash)
+    names = [str(i.title) for i in docs]
+    sources = await DocumentCRUD.generate_signed_urls(
+        supabase, file_hashes=sources_hash, names=names
+    )
 
     gen = QueryService.query(msg.query, merged_context, groq)
     final_reply = ""
-
-    # async def stream():
-    #     nonlocal final_reply
-    #     async for content in gen:
-    #         final_reply += content
-    #         yield f"data: {json.dumps({'type': 'stream', 'data': content})}\n\n"
-    #     yield f"data: {json.dumps({'type': 'final', 'data': final_reply, 'sources': sources})}\n\n"
 
     async def stream():
         nonlocal final_reply
         async for content in gen:
             final_reply += content
-            yield content
+            yield f"data: {json.dumps({'type': 'stream', 'data': content})}\n\n"
         yield f"data: {json.dumps({'type': 'final', 'data': final_reply, 'sources': sources})}\n\n"
+
+    # async def stream():
+    #     nonlocal final_reply
+    #     async for content in gen:
+    #         final_reply += content
+    #         yield content
+    #     yield f"data: {json.dumps({'type': 'final', 'data': final_reply, 'sources': sources})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")

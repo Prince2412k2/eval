@@ -160,6 +160,11 @@ class DocumentCRUD:
         results: dict[str, str | None] = {}
 
         for file_hash, name in zip(file_hashes, names):
+            print("-------------------------")
+            print(file_hash)
+            print("-------------------------")
+            print(name)
+            print("-------------------------")
             try:
                 res = await supabase.storage.from_(
                     Defaults.BUCKET_NAME
@@ -170,7 +175,7 @@ class DocumentCRUD:
                 results[name] = res.get("signedURL")
             except Exception as e:
                 # log but do not fail batch
-                print(f"Error generating signed URL for {file_hash}: {e}")
+                print(f"Error generating signed URL for {file_hash}: {str(e)}")
 
         return results
 
