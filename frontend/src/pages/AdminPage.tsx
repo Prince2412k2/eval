@@ -40,6 +40,14 @@ interface Document {
     signed_url?: string;
 }
 
+interface UploadFileStatus {
+    name: string;
+    status: 'uploading' | 'success' | 'failed' | 'duplicate';
+    progress?: string;
+    error?: string;
+    result?: any;
+}
+
 function AdminPage() {
     const [metrics, setMetrics] = useState<Metrics | null>(null);
     const [documents, setDocuments] = useState<Document[]>([]);
@@ -47,6 +55,8 @@ function AdminPage() {
     const [deleting, setDeleting] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<string>('');
+    const [multiFileUploading, setMultiFileUploading] = useState(false);
+    const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
     const { isDarkMode, toggleDarkMode } = useDarkMode();
 
     useEffect(() => {
@@ -95,34 +105,17 @@ function AdminPage() {
             });
 
             if (response.ok) {
-                await loadData(); // Reload both metrics and documents
+                await loadDocuments();
+                await loadMetrics();
             } else {
                 alert('Failed to delete document');
             }
         } catch (error) {
-            console.error('Failed to delete document:', error);
+            console.error('Delete error:', error);
             alert('Failed to delete document');
         } finally {
             setDeleting(null);
         }
-    };
-
-    const formatBytes = (bytes: number): string => {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    };
-
-    const formatDate = (dateString: string): string => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,16 +135,10 @@ function AdminPage() {
             });
 
             if (response.ok) {
-                setUploadProgress('Processing document...');
-
-                // Poll for completion or wait for response
-                const result = await response.json();
-
-                setUploadProgress('Upload complete!');
-                setTimeout(() => {
-                    setUploadProgress('');
-                    loadData(); // Reload data
-                }, 1500);
+                setUploadProgress('Upload successful!');
+                await loadDocuments();
+                await loadMetrics();
+                setTimeout(() => setUploadProgress(''), 2000);
             } else {
                 const error = await response.json();
                 alert(`Upload failed: ${error.detail || 'Unknown error'}`);
@@ -163,170 +150,354 @@ function AdminPage() {
             setUploadProgress('');
         } finally {
             setUploading(false);
-            // Reset file input
             e.target.value = '';
         }
     };
 
+    const handleMultiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const fileArray = Array.from(files);
+        setMultiFileUploading(true);
+
+        const statusMap = new Map<string, UploadFileStatus>();
+        fileArray.forEach(file => {
+            statusMap.set(file.name, {
+                name: file.name,
+                status: 'uploading',
+                progress: 'Starting...'
+            });
+        });
+        setUploadStatuses(Array.from(statusMap.values()));
+
+        try {
+            const formData = new FormData();
+            fileArray.forEach(file => {
+                formData.append('files', file);
+            });
+
+            const response = await fetch('http://localhost:8000/api/upload/bulk', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Upload request failed');
+            }
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            if (!reader) {
+                throw new Error('No response body');
+            }
+
+            let buffer = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            
+                            let frontendStatus: 'uploading' | 'success' | 'failed' | 'duplicate' = 'uploading';
+                            if (data.status === 'success') {
+                                frontendStatus = 'success';
+                            } else if (data.status === 'failed') {
+                                frontendStatus = 'failed';
+                            } else if (data.status === 'duplicate') {
+                                frontendStatus = 'duplicate';
+                            }
+                            
+                            statusMap.set(data.filename, {
+                                name: data.filename,
+                                status: frontendStatus,
+                                progress: data.message || data.stage,
+                                error: data.error,
+                                result: data
+                            });
+                            
+                            setUploadStatuses(Array.from(statusMap.values()));
+                        } catch (err) {
+                            console.error('Failed to parse SSE data:', err);
+                        }
+                    }
+                }
+            }
+
+            setTimeout(() => {
+                loadData();
+                setTimeout(() => {
+                    setUploadStatuses([]);
+                }, 5000);
+            }, 1500);
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Upload failed. Please try again.');
+            setUploadStatuses([]);
+        } finally {
+            setMultiFileUploading(false);
+            e.target.value = '';
+        }
+    };
+
+    const formatBytes = (bytes: number): string => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+    };
+
+    const formatDate = (dateString: string): string => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
     return (
-        <div className="admin-page">
-            <header className="admin-header">
-                <div className="admin-header-content">
-                    <div className="admin-title-section">
-                        <Link to="/chat" className="back-link">
-                            <ArrowLeft size={20} />
-                        </Link>
-                        <h1 className="admin-title">Admin Dashboard</h1>
-                    </div>
-                    <div className="admin-actions">
-                        <button onClick={toggleDarkMode} className="theme-toggle" aria-label="Toggle theme">
-                            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-                        </button>
-                        <button onClick={loadData} className="refresh-btn" disabled={loading}>
-                            <RefreshCw size={18} className={loading ? 'spinning' : ''} />
-                            Refresh
-                        </button>
+        <div className="min-h-screen bg-[var(--color-bg-primary)]">
+            <header className="bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] sticky top-0 z-10">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <Link to="/chat" className="p-2 hover:bg-[var(--color-bg-hover)] rounded-lg transition-colors">
+                                <ArrowLeft size={20} className="text-[var(--color-text-primary)]" />
+                            </Link>
+                            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Admin Dashboard</h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={toggleDarkMode} 
+                                className="p-2 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-hover)] transition-colors"
+                                aria-label="Toggle theme"
+                            >
+                                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+                            <button 
+                                onClick={loadData} 
+                                className="flex items-center gap-2 px-4 py-2 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-hover)] transition-colors disabled:opacity-50"
+                                disabled={loading}
+                            >
+                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                                Refresh
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>
 
-            <main className="admin-content">
+            <main className="max-w-7xl mx-auto px-6 py-8">
                 {/* Metrics Section */}
-                <section className="metrics-section">
-                    <h2 className="section-title">System Metrics</h2>
-                    <div className="metrics-grid">
-                        <div className="metric-card">
-                            <div className="metric-icon documents">
-                                <FileText size={24} />
-                            </div>
-                            <div className="metric-info">
-                                <div className="metric-label">Documents</div>
-                                <div className="metric-value">{metrics?.documents.total || 0}</div>
-                            </div>
-                        </div>
-
-                        <div className="metric-card">
-                            <div className="metric-icon conversations">
-                                <MessageSquare size={24} />
-                            </div>
-                            <div className="metric-info">
-                                <div className="metric-label">Conversations</div>
-                                <div className="metric-value">{metrics?.conversations.total || 0}</div>
-                            </div>
-                        </div>
-
-                        <div className="metric-card">
-                            <div className="metric-icon messages">
-                                <Database size={24} />
-                            </div>
-                            <div className="metric-info">
-                                <div className="metric-label">Messages</div>
-                                <div className="metric-value">{metrics?.messages.total || 0}</div>
-                            </div>
-                        </div>
-
-                        <div className="metric-card">
-                            <div className="metric-icon tokens">
-                                <DollarSign size={24} />
-                            </div>
-                            <div className="metric-info">
-                                <div className="metric-label">Token Usage</div>
-                                <div className="metric-value">
-                                    {(metrics?.tokens.total_tokens || 0).toLocaleString()}
+                <section className="mb-8">
+                    <h2 className="text-xl font-semibold text-[var(--color-text-primary)] mb-4">System Metrics</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl p-6 hover:shadow-lg transition-shadow">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                    <FileText size={24} className="text-blue-600 dark:text-blue-400" />
                                 </div>
-                                <div className="metric-subtext">
-                                    ${(metrics?.tokens.total_cost_usd || 0).toFixed(4)} cost
+                                <div>
+                                    <div className="text-sm text-[var(--color-text-secondary)]">Documents</div>
+                                    <div className="text-2xl font-bold text-[var(--color-text-primary)]">{metrics?.documents.total || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl p-6 hover:shadow-lg transition-shadow">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                                    <MessageSquare size={24} className="text-green-600 dark:text-green-400" />
+                                </div>
+                                <div>
+                                    <div className="text-sm text-[var(--color-text-secondary)]">Conversations</div>
+                                    <div className="text-2xl font-bold text-[var(--color-text-primary)]">{metrics?.conversations.total || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl p-6 hover:shadow-lg transition-shadow">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                                    <Database size={24} className="text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <div>
+                                    <div className="text-sm text-[var(--color-text-secondary)]">Total Tokens</div>
+                                    <div className="text-2xl font-bold text-[var(--color-text-primary)]">{metrics?.tokens.total_tokens.toLocaleString() || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl p-6 hover:shadow-lg transition-shadow">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                                    <DollarSign size={24} className="text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                    <div className="text-sm text-[var(--color-text-secondary)]">Total Cost</div>
+                                    <div className="text-2xl font-bold text-[var(--color-text-primary)]">${metrics?.tokens.total_cost_usd.toFixed(4) || '0.0000'}</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                {/* Documents Section */}
-                <section className="documents-section">
-                    <div className="section-header">
-                        <h2 className="section-title">Document Management</h2>
-                        <div className="upload-section">
-                            {uploadProgress && (
-                                <span className="upload-progress">{uploadProgress}</span>
-                            )}
-                            <label htmlFor="file-upload" className={`upload-btn ${uploading ? 'uploading' : ''}`}>
-                                <Upload size={18} />
-                                {uploading ? 'Uploading...' : 'Upload Document'}
-                            </label>
-                            <input
-                                id="file-upload"
-                                type="file"
-                                accept=".pdf,.doc,.docx,.txt"
-                                onChange={handleFileUpload}
-                                disabled={uploading}
-                                style={{ display: 'none' }}
-                            />
+                {/* Upload Section */}
+                <section className="mb-8">
+                    <h2 className="text-xl font-semibold text-[var(--color-text-primary)] mb-4">Upload Documents</h2>
+                    <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl p-6">
+                        <div className="flex flex-wrap gap-4">
+                            <div>
+                                <label className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <Upload size={18} />
+                                    Upload Single
+                                    <input
+                                        type="file"
+                                        onChange={handleFileUpload}
+                                        accept=".pdf,.doc,.docx,.txt"
+                                        disabled={uploading || multiFileUploading}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
+                            <div>
+                                <label className="flex items-center gap-2 px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <Upload size={18} />
+                                    Upload Multiple
+                                    <input
+                                        type="file"
+                                        onChange={handleMultiFileUpload}
+                                        accept=".pdf,.doc,.docx,.txt"
+                                        multiple
+                                        disabled={uploading || multiFileUploading}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
                         </div>
-                    </div>
 
-                    {documents.length === 0 ? (
-                        <div className="empty-documents">
-                            <FileText size={48} opacity={0.3} />
-                            <p>No documents uploaded yet</p>
-                        </div>
-                    ) : (
-                        <div className="documents-table-wrapper">
-                            <table className="documents-table">
-                                <thead>
+                        {uploadProgress && (
+                            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-700 dark:text-blue-300">
+                                {uploadProgress}
+                            </div>
+                        )}
+
+                        {uploadStatuses.length > 0 && (
+                            <div className="mt-4">
+                                <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">Upload Progress</h3>
+                                <div className="space-y-2">
+                                    {uploadStatuses.map((status, idx) => (
+                                        <div key={idx} className={`flex items-center gap-3 p-3 rounded-lg border ${
+                                            status.status === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
+                                            status.status === 'failed' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
+                                            status.status === 'duplicate' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' :
+                                            'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                                        }`}>
+                                            <span className="text-lg">
+                                                {status.status === 'uploading' && '⏳'}
+                                                {status.status === 'success' && '✓'}
+                                                {status.status === 'failed' && '✗'}
+                                                {status.status === 'duplicate' && '⚠'}
+                                            </span>
+                                            <span className="font-medium text-sm text-[var(--color-text-primary)] flex-shrink-0">{status.name}</span>
+                                            <span className="text-sm text-[var(--color-text-secondary)] flex-1">
+                                                {status.progress || (status.status === 'success' && 'Uploaded successfully') || (status.status === 'duplicate' && 'Already exists') || (status.status === 'failed' && (status.error || 'Upload failed')) || 'Processing...'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Documents Section */}
+                <section>
+                    <h2 className="text-xl font-semibold text-[var(--color-text-primary)] mb-4">Documents</h2>
+                    <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-[var(--color-bg-tertiary)] border-b border-[var(--color-border)]">
                                     <tr>
-                                        <th>Title</th>
-                                        <th>Type</th>
-                                        <th>Size</th>
-                                        <th>Pages</th>
-                                        <th>Chunks</th>
-                                        <th>Created</th>
-                                        <th>Actions</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Title</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Type</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Size</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Pages</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Chunks</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Created</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {documents.map(doc => (
-                                        <tr key={doc.id}>
-                                            <td className="doc-title">
-                                                {doc.signed_url ? (
-                                                    <a
-                                                        href={doc.signed_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="doc-link"
-                                                    >
-                                                        {doc.title}
-                                                        <ExternalLink size={14} />
-                                                    </a>
-                                                ) : (
-                                                    doc.title
-                                                )}
-                                            </td>
-                                            <td>{doc.mime_type.split('/')[1]?.toUpperCase() || 'PDF'}</td>
-                                            <td>{formatBytes(doc.file_size)}</td>
-                                            <td>{doc.page_count || '-'}</td>
-                                            <td>{doc.chunk_count || '-'}</td>
-                                            <td>{formatDate(doc.created_at)}</td>
-                                            <td>
-                                                <button
-                                                    onClick={() => deleteDocument(doc.id, doc.title)}
-                                                    className="delete-btn"
-                                                    disabled={deleting === doc.id}
-                                                    title="Delete document"
-                                                >
-                                                    {deleting === doc.id ? (
-                                                        <div className="mini-spinner" />
-                                                    ) : (
-                                                        <Trash2 size={16} />
-                                                    )}
-                                                </button>
+                                <tbody className="divide-y divide-[var(--color-border)]">
+                                    {documents.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} className="px-6 py-12 text-center text-[var(--color-text-tertiary)]">
+                                                No documents found
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        documents.map((doc) => (
+                                            <tr key={doc.hash} className="hover:bg-[var(--color-bg-hover)] transition-colors">
+                                                <td className="px-6 py-4 text-sm font-medium text-[var(--color-text-primary)]">{doc.title}</td>
+                                                <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">{doc.mime_type}</td>
+                                                <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">{formatBytes(doc.file_size)}</td>
+                                                <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">{doc.page_count}</td>
+                                                <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">{doc.chunk_count}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                        doc.status === 'indexed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                                                        doc.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
+                                                        'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                                                    }`}>
+                                                        {doc.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">{formatDate(doc.created_at)}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        {doc.signed_url && (
+                                                            <a
+                                                                href={doc.signed_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                                                title="View document"
+                                                            >
+                                                                <ExternalLink size={16} />
+                                                            </a>
+                                                        )}
+                                                        <button
+                                                            onClick={() => deleteDocument(doc.hash, doc.title)}
+                                                            disabled={deleting === doc.hash}
+                                                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                                                            title="Delete document"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>
-                    )}
+                    </div>
                 </section>
             </main>
         </div>
