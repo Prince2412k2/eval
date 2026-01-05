@@ -13,6 +13,7 @@ This system enables users to upload policy documents (PDF, DOCX, TXT) and ask na
 - ✅ Structure-aware semantic chunking
 - ✅ Custom re-ranking with recency, hierarchy, and adjacency scoring
 - ✅ Transparent citations with verification API
+- ✅ **Security guard** for prompt injection protection
 - ✅ Streaming responses for better UX
 - ✅ Conversation history with context management
 - ✅ Edge case handling (contradictions, out-of-scope queries, ambiguity)
@@ -29,6 +30,7 @@ This system enables users to upload policy documents (PDF, DOCX, TXT) and ask na
 - **LLMs**: 
   - Main: `openai/gpt-oss-120b` (via Groq)
   - Citations: `llama-3.1-8b-instant` (via Groq)
+  - Security Guard: `openai/gpt-oss-120b` (via Groq)
 - **Embeddings**: `BAAI/bge-small-en-v1.5` (384-dim, via FastEmbed)
 - **Document Parsing**: LlamaParse (LlamaIndex)
 - **ORM**: SQLAlchemy
@@ -91,26 +93,40 @@ This system enables users to upload policy documents (PDF, DOCX, TXT) and ask na
    cd eval
    ```
 
-2. **Create `.env` files**:
+2. **Set up external services**:
+   
+   This project uses **external/hosted services** for:
+   - **PostgreSQL**: Database for conversations, documents, and metadata
+   - **Qdrant**: Vector database for semantic search
+   - **Supabase**: File storage for uploaded documents
+   
+   You'll need to set up these services separately (e.g., via cloud providers).
+
+3. **Create environment file**:
+
+   Copy the example and fill in your credentials:
+   ```bash
+   cp .env.example backend/.env
+   ```
 
    **Backend** (`backend/.env`):
    ```env
    LLAMAINDEX=<llama-cloud-api-key>
-   DB_URL=postgresql://user:password@db:5432/policy_db
+   DB_URL=postgresql://user:password@your-db-host:5432/policy_db
    GROQ_API=<groq-api-key>
-   QDRANT_URL=http://qdrant:6333
+   QDRANT_URL=https://your-qdrant-instance.cloud:6333
    QDRANT_API_KEY=<qdrant-api-key>
-   SUPABASE_URL=<supabase-url>
-   SUPABASE_KEY=<supabase-key>
-   SECRET_KEY=<random-secret-key>
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_KEY=<supabase-anon-key>
+   SECRET_KEY=<generate-with-openssl-rand-hex-32>
    ```
 
-3. **Start services**:
+4. **Start services**:
    ```bash
    docker-compose up -d
    ```
 
-4. **Access the application**:
+5. **Access the application**:
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
@@ -159,13 +175,14 @@ final_score = similarity × 0.5 + recency × 0.2 + hierarchy × 0.2 + adjacency 
 - **Hierarchy (20%)**: Definitions and policy rules are more valuable than tangential mentions
 - **Adjacency (10%)**: Consecutive chunks indicate coherent sections
 
-### 3. Dual-LLM Citation System
+### 3. Triple-LLM Architecture with Security
 
 **Parallel execution**:
+- **Security guard** (`gpt-oss-120b`) validates user input for prompt injections
 - Fast model (`llama-3.1-8b-instant`) extracts citations in JSON
 - Main model (`gpt-oss-120b`) streams the answer
 
-**Why?** Parallel execution keeps latency at ~2-3s (vs. 4-5s sequential). Cost: ~$0.0011 per query.
+**Why?** Parallel execution keeps latency at ~2-3s while providing security, citations, and quality answers. Total cost: ~$0.0015-0.002 per query.
 
 ### 4. Embedding Model: BAAI/bge-small-en-v1.5
 
@@ -201,7 +218,8 @@ npm test
 | Query Latency (p95) | ~4s |
 | Vector Search | ~100ms |
 | Re-ranking | ~50ms |
-| Cost per Query | ~$0.0011 |
+| Security Guard | ~500ms |
+| Cost per Query | ~$0.0015-0.002 |
 | Embedding Speed | ~10-20ms |
 
 ---
