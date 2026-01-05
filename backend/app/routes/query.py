@@ -33,24 +33,27 @@ async def ask(
 ):
     # Step 1: Get or create conversation
     if msg.conversation_id:
-        conversation = await ConversationService.get_conversation(db, msg.conversation_id)
+        conversation = await ConversationService.get_conversation(
+            db, msg.conversation_id
+        )
         if not conversation:
             from fastapi import HTTPException
+
             raise HTTPException(404, "Conversation not found")
     else:
         conversation = await ConversationService.create_conversation(db)
-    
+
     # Step 2: Save user message
-    await ConversationService.add_message(
-        db, conversation.id, "user", msg.query
-    )
-    
+    await ConversationService.add_message(db, conversation.id, "user", msg.query)
+
     # Step 3: Get conversation history for context
     history = await ConversationService.get_conversation_history(
         db, conversation.id, last_n=5
     )
-    conversation_context = ConversationService.build_context_from_history(history[:-1])  # Exclude current message
-    
+    conversation_context = ConversationService.build_context_from_history(
+        history[:-1]
+    )  # Exclude current message
+
     # Step 4: Embed the query (optionally enhanced with conversation context)
     # Use conversation context if available for better retrieval
     enhanced_query = msg.query
@@ -58,7 +61,7 @@ async def ask(
         # Optionally enhance query with recent context (commented out for now)
         # enhanced_query = f"{conversation_context}\n\nCurrent question: {msg.query}"
         pass
-    
+
     query_embedd = EmbeddingService.embed_string(enhanced_query)
 
     # Step 5: Retrieve initial candidates (more than final top_k for reranking)
@@ -120,7 +123,7 @@ async def ask(
                         document_name=doc_name,
                         text_span=raw_cit.get("text_span"),
                         confidence_score=1.0,
-                        document_url=doc_url_map.get(doc_name)
+                        document_url=doc_url_map.get(doc_name),
                     )
                     citations.append(citation)
             return citations
@@ -146,7 +149,7 @@ async def ask(
         # Wait for citations to complete (should be done by now)
         citations = await citation_task
         formatted_citations = CitationService.format_citations_for_response(citations)
-        
+
         # Save assistant message
         await ConversationService.add_message(
             db,
@@ -154,16 +157,13 @@ async def ask(
             "assistant",
             final_reply,
             sources=list(sources_hash),
-            citations=formatted_citations
+            citations=formatted_citations,
         )
-        
+
         # Update conversation metadata
         topics = ConversationService.extract_topics_from_query(msg.query)
         await ConversationService.update_conversation_metadata(
-            db,
-            conversation.id,
-            documents=list(sources_hash),
-            topics=topics
+            db, conversation.id, documents=list(sources_hash), topics=topics
         )
 
         # Send final message with citations and conversation_id
