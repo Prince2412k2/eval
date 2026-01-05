@@ -1,4 +1,4 @@
-# Use Python 3.12 as specified in pyproject.toml
+# Use Python 3.12
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -9,15 +9,11 @@ RUN apt-get update && apt-get install -y \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Install uv for faster dependency management
-RUN pip install --no-cache-dir uv
+# Copy dependency file
+COPY requirements.txt .
 
-# Copy dependency files
-COPY pyproject.toml ./
-COPY requirements.txt ./
-
-# Install Python dependencies using uv (faster than pip)
-RUN uv pip install --system -r requirements.txt
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
