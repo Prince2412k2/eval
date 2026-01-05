@@ -164,14 +164,14 @@
 
 ### README / DESIGN.md
 
-- [ ] Chunking strategy explanation (200–300 words)
-- [ ] Re-ranking weights justification (150–200 words)
-- [ ] Citation handling explanation (100–150 words)
-- [ ] Cross-reference UX decision (100–150 words)
-- [ ] Embedding model choice
-- [ ] Chunk size trade-offs
-- [ ] DB schema description
-- [ ] Failure mode analysis
+- [x] Chunking strategy explanation (200–300 words)
+- [x] Re-ranking weights justification (150–200 words)
+- [x] Citation handling explanation (100–150 words)
+- [x] Cross-reference UX decision (100–150 words)
+- [x] Embedding model choice
+- [x] Chunk size trade-offs
+- [x] DB schema description
+- [x] Failure mode analysis
 
 ---
 
@@ -188,7 +188,7 @@
 
 - [x] System says “I don’t know” when unsure
 - [x] Citations actually support answers
-- [ ] README explains **why**, not just **what**
+- [x] README explains **why**, not just **what**
 - [ ] No default-only logic
 
 ---

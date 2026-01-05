@@ -1,5 +1,6 @@
 from typing import List, Dict, Optional
 from dataclasses import dataclass
+from app.core.config import Defaults
 
 
 @dataclass
@@ -242,9 +243,7 @@ class RerankerService:
             Extended list with adjacent chunks included and re-sorted
         """
         result = scored_chunks.copy()
-        included_keys = {
-            (c.get("document_id"), c.get("chunk_index")) for c in result
-        }
+        included_keys = {(c.get("document_id"), c.get("chunk_index")) for c in result}
 
         # For each high-scoring chunk, find and add its neighbors
         for chunk in scored_chunks:
@@ -279,3 +278,43 @@ class RerankerService:
         # Re-sort by score
         result.sort(key=lambda x: x["rerank_score"], reverse=True)
         return result
+
+    @staticmethod
+    def enforce_token_budget(
+        chunks: List[Dict],
+        chars_per_token: float = 4.0,
+    ) -> List[Dict]:
+        """
+        Enforce token budget by selecting best subset of chunks.
+        Strategy:
+        - Iterate through sorted chunks (by rerank_score)
+        - Add chunks until token budget is reached
+        - Avoid redundant information
+        Args:
+            chunks: Reranked chunks (should be sorted by score)
+            max_tokens: Maximum token budget
+            chars_per_token: Approximate characters per token (default: 4.0)
+        Returns:
+            Subset of chunks that fit within token budget
+        """
+        max_chars = int(Defaults.CONTEXT_WINDOW_QUERYLLM - 16000 * chars_per_token)
+        selected_chunks = []
+        total_chars = 0
+        for chunk in chunks:
+            chunk_text = chunk.get("text", "")
+            chunk_chars = len(chunk_text)
+            # Check if adding this chunk would exceed budget
+            if total_chars + chunk_chars <= max_chars:
+                selected_chunks.append(chunk)
+                total_chars += chunk_chars
+            else:
+                # Try to fit partial chunk if there's remaining space
+                remaining_chars = max_chars - total_chars
+                if remaining_chars > 200:  # Only if we can fit meaningful content
+                    # Truncate chunk text
+                    truncated_chunk = chunk.copy()
+                    truncated_chunk["text"] = chunk_text[:remaining_chars] + "..."
+                    truncated_chunk["truncated"] = True
+                    selected_chunks.append(truncated_chunk)
+                break
+        return selected_chunks

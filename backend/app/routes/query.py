@@ -92,23 +92,20 @@ async def ask(
     query_embedd = EmbeddingService.embed_string(enhanced_query)
 
     # Step 5: Retrieve initial candidates (more than final top_k for reranking)
-    # initial_chunks
-    reranked_chunks = await VectorService.query_similar_chunks(
+    initial_chunks = await VectorService.query_similar_chunks(
         query_embedding=query_embedd, qdrant=qdrant, top_k=20
     )
 
     # Step 3: Rerank chunks using custom scoring
-    # reranked_chunks = RerankerService.rerank_chunks(
-    #     chunks=initial_chunks,
-    #     top_k=10,  # Get top 10 after reranking
-    #     include_adjacent=True,  # Include adjacent chunks for context
-    # )
+    reranker = RerankerService()
+    reranked_chunks = reranker.rerank(
+        chunks=initial_chunks,
+    )
 
     # Step 4: Enforce token budget to avoid context overflow
     final_chunks = RerankerService.enforce_token_budget(
         chunks=reranked_chunks,
     )
-    print(f"Final chunks selected: {len(final_chunks)}")
 
     # Step 5: Format context for LLM
     merged_context = VectorService.format_context(final_chunks)
@@ -196,12 +193,5 @@ async def ask(
 
         # Send final message with citations and conversation_id
         yield f"data: {json.dumps({'type': 'final', 'data': final_reply, 'sources': sources, 'citations': formatted_citations, 'conversation_id': str(conversation.id)})}\n\n"
-
-    # async def stream():
-    #     nonlocal final_reply
-    #     async for content in gen:
-    #         final_reply += content
-    #         yield content
-    #     yield f"data: {json.dumps({'type': 'final', 'data': final_reply, 'sources': sources})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
