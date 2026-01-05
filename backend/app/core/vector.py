@@ -54,11 +54,6 @@ async def init_qdrant():
         )
         await qdrant.create_payload_index(
             collection_name="documents",
-            field_name="owner_id",
-            field_schema="uuid",  # pyright: ignore
-        )
-        await qdrant.create_payload_index(
-            collection_name="documents",
             field_name="document_id",
             field_schema="keyword",  # pyright: ignore
         )

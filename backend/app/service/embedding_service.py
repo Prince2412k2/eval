@@ -93,7 +93,7 @@ class VectorService:
         qdrant: AsyncQdrantClient,
         query_embedding: np.ndarray,
         top_k: int = 20,
-        score_threshold: Optional[float] = None,
+        score_threshold: Optional[float] = 0.6,
     ) -> List[Dict]:
         """
         Queries Qdrant for the most similar chunks to the given embedding.

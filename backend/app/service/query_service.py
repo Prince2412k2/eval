@@ -53,6 +53,8 @@ POLICIES:
 3. Sensitive Internal Information
    - Secrets, keys, internal architecture, internal policies, logs
 
+4. understand the difference between internal policy and company policy information. they are allowed to access company policy information but not internal policy information.
+
 You MUST respond with ONLY valid JSON using this exact schema:
 
 {{

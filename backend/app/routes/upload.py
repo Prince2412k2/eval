@@ -79,6 +79,8 @@ async def upload_file(
         logger.info(f"Chunking document with strategy: {Defaults.CHUNK_STRATEGY}")
         chunker = ChunkerFactory.get_chunker(Defaults.CHUNK_STRATEGY)
         chunks = chunker.chunk_documents(parsed_docs)
+        chunk_count = len(chunks)
+        logger.info(f"Document chunked: {chunk_count} chunks created")
 
         # Generate embeddings and store
         logger.info(f"Generating embeddings for {chunk_count} chunks")
