@@ -8,7 +8,7 @@ engine = create_async_engine(
     settings.DB_URL,
     future=True,
     connect_args={"server_settings": {"search_path": "public"}},
-    echo=True,
+    # echo=True,
 )
 
 AsyncSessionLocal: sessionmaker[AsyncSession] = sessionmaker(  # type: ignore

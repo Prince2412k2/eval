@@ -79,8 +79,6 @@ async def upload_file(
         logger.info(f"Chunking document with strategy: {Defaults.CHUNK_STRATEGY}")
         chunker = ChunkerFactory.get_chunker(Defaults.CHUNK_STRATEGY)
         chunks = chunker.chunk_documents(parsed_docs)
-        chunk_count = len(chunks)
-        logger.info(f"Document chunked: {chunk_count} chunks created")
 
         # Generate embeddings and store
         logger.info(f"Generating embeddings for {chunk_count} chunks")
@@ -144,74 +142,76 @@ async def upload_multiple_files(
 ):
     """
     Upload and process multiple documents with real-time progress streaming via SSE
-    
+
     Streams progress updates for each file through all processing stages:
     - hashing → uploading → parsing → chunking → embedding → storing → finished
     """
     logger.info(f"Starting SSE bulk upload for {len(files)} files")
-    
+
     async def event_stream():
         """Stream progress updates for all files"""
-        
+
         for file in files:
             file_hash = None
             filename = file.filename or "Untitled"
-            
+
             # Create independent session for this file
             async with AsyncSessionLocal() as db:
                 try:
                     # Stage 1: Hashing
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.HASHING, status=FileStatus.PROCESSING, message='Calculating file hash').model_dump())}\n\n"
-                    
+
                     file_hash = await SupabaseFileCRUD._hash_bytes(file)
                     await file.seek(0)
                     file_content = await file.read()
                     file_size = len(file_content)
                     await file.seek(0)
-                    
+
                     logger.info(f"[SSE] {filename}: hash={file_hash}, size={file_size}")
-                    
+
                     # Stage 2: Uploading to DB and Supabase
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.UPLOADING, status=FileStatus.PROCESSING, message='Uploading file', hash=file_hash, file_size=file_size).model_dump())}\n\n"
-                    
+
                     data = DocumentCreate(
                         mime_type=file.content_type or "",
                         title=filename,
                         file_size=file_size,
                         status="processing",
                     )
-                    
+
                     doc = await DocumentCRUD.create(db, data, file_hash)
                     await SupabaseFileCRUD.create(file, file_hash, supabase)
-                    
+
                     # Stage 3: Parsing
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.PARSING, status=FileStatus.PROCESSING, message='Parsing document', hash=file_hash).model_dump())}\n\n"
-                    
+
                     parsed_docs = await DocumentService.parse(file)
                     page_count = len(parsed_docs)
                     logger.info(f"[SSE] {filename}: {page_count} pages parsed")
-                    
+
                     # Stage 4: Chunking
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.CHUNKING, status=FileStatus.PROCESSING, message=f'Chunking {page_count} pages', hash=file_hash, page_count=page_count).model_dump())}\n\n"
-                    
+
                     chunker = ChunkerFactory.get_chunker(Defaults.CHUNK_STRATEGY)
                     chunks = chunker.chunk_documents(parsed_docs)
                     chunk_count = len(chunks)
                     logger.info(f"[SSE] {filename}: {chunk_count} chunks created")
-                    
+
                     # Stage 5: Embedding
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.EMBEDDING, status=FileStatus.PROCESSING, message=f'Generating embeddings for {chunk_count} chunks', hash=file_hash, chunk_count=chunk_count).model_dump())}\n\n"
-                    
+
                     embeddings = EmbeddingService.embed_chunks(chunks)
-                    
+
                     # Stage 6: Storing
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.STORING, status=FileStatus.PROCESSING, message='Storing vectors in Qdrant', hash=file_hash).model_dump())}\n\n"
-                    
-                    await VectorService.upsert_chunks(qdrant, file_hash, chunks, embeddings)
-                    
+
+                    await VectorService.upsert_chunks(
+                        qdrant, file_hash, chunks, embeddings
+                    )
+
                     # Stage 7: Updating metadata
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.UPDATING, status=FileStatus.PROCESSING, message='Updating metadata', hash=file_hash).model_dump())}\n\n"
-                    
+
                     updated_doc = await DocumentCRUD.update_metadata(
                         db=db,
                         doc_hash=file_hash,
@@ -219,27 +219,29 @@ async def upload_multiple_files(
                         chunk_count=chunk_count,
                         status="indexed",
                     )
-                    
+
                     # Stage 8: Finished
                     logger.info(f"[SSE] ✅ {filename}: Complete")
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.FINISHED, status=FileStatus.SUCCESS, message='Upload complete', hash=file_hash, file_size=file_size, page_count=page_count, chunk_count=chunk_count).model_dump())}\n\n"
-                    
+
                 except IntegrityError:
                     logger.warning(f"[SSE] ⚠ {filename}: Duplicate (hash={file_hash})")
                     await db.rollback()
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.FINISHED, status=FileStatus.DUPLICATE, message='File already exists', hash=file_hash).model_dump())}\n\n"
-                    
+
                 except Exception as e:
                     logger.error(f"[SSE] ❌ {filename}: {str(e)}")
                     await db.rollback()
-                    
+
                     # Try to mark as failed
                     if file_hash:
                         try:
-                            await DocumentCRUD.update_metadata(db=db, doc_hash=file_hash, status="failed")
+                            await DocumentCRUD.update_metadata(
+                                db=db, doc_hash=file_hash, status="failed"
+                            )
                         except:
                             pass
-                    
+
                     yield f"data: {json.dumps(UploadProgress(filename=filename, stage=FileStage.FINISHED, status=FileStatus.FAILED, message='Upload failed', error=str(e), hash=file_hash).model_dump())}\n\n"
-    
+
     return StreamingResponse(event_stream(), media_type="text/event-stream")

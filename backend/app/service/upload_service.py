@@ -138,7 +138,6 @@ class DocumentCRUD:
         await db.refresh(document)
         return document
 
-
     @staticmethod
     async def get_all(db: AsyncSession) -> list[Document]:
         """Fetch all documents."""
@@ -166,11 +165,6 @@ class DocumentCRUD:
         results: dict[str, str | None] = {}
 
         for file_hash, name in zip(file_hashes, names):
-            print("-------------------------")
-            print(file_hash)
-            print("-------------------------")
-            print(name)
-            print("-------------------------")
             try:
                 res = await supabase.storage.from_(
                     Defaults.BUCKET_NAME

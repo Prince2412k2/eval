@@ -26,6 +26,7 @@ class Defaults:
     CHUNK_STRATEGY: Strategy = Strategy.SEMANTIC
 
     BUCKET_NAME = "Documents"
+    CONTEXT_WINDOW_QUERYLLM = 131072
 
 
 settings = Settings()  # pyright: ignore

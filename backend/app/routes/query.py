@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from groq import AsyncGroq
 from qdrant_client.async_qdrant_client import AsyncQdrantClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,18 +31,50 @@ async def ask(
     db: AsyncSession = Depends(get_db),
     supabase: AsyncClient = Depends(get_supabase),
 ):
+    msg.query = msg.query.lower().strip()
     # Step 1: Get or create conversation
     if msg.conversation_id:
         conversation = await ConversationService.get_conversation(
             db, msg.conversation_id
         )
         if not conversation:
-            from fastapi import HTTPException
-
             raise HTTPException(404, "Conversation not found")
     else:
         conversation = await ConversationService.create_conversation(db)
 
+    guard = await QueryService.guard_query_with_oss(
+        query=msg.query,
+        groq=groq,
+    )
+    if not guard["allowed"]:
+        await ConversationService.add_message(
+            db=db,
+            conversation_id=conversation.id,
+            role="user",
+            content=msg.query,
+            extra_metadata={
+                "guard": {
+                    "allowed": guard["allowed"],
+                    "violations": guard["violations"],
+                    "reason": guard["reason"],
+                    "confidence": guard["confidence"],
+                }
+            },
+        )
+
+        async def guard_stream():
+            payload = {
+                "type": "final",
+                "data": f"Sorry, I can't help with that request. because {guard['reason']} \n\n ##### Violations \n {' '.join(guard['violations'])}",
+                "reason": guard["reason"],
+                "violations": guard["violations"],
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+
+        return StreamingResponse(
+            guard_stream(),
+            media_type="text/event-stream",
+        )
     # Step 2: Save user message
     await ConversationService.add_message(db, conversation.id, "user", msg.query)
 
@@ -50,37 +82,33 @@ async def ask(
     history = await ConversationService.get_conversation_history(
         db, conversation.id, last_n=5
     )
-    conversation_context = ConversationService.build_context_from_history(
-        history[:-1]
-    )  # Exclude current message
+    conversation_context = ConversationService.build_context_from_history(history[:-1])
 
-    # Step 4: Embed the query (optionally enhanced with conversation context)
-    # Use conversation context if available for better retrieval
     enhanced_query = msg.query
     if conversation_context:
-        # Optionally enhance query with recent context (commented out for now)
-        # enhanced_query = f"{conversation_context}\n\nCurrent question: {msg.query}"
+        # TODO: add previous context
         pass
 
     query_embedd = EmbeddingService.embed_string(enhanced_query)
 
     # Step 5: Retrieve initial candidates (more than final top_k for reranking)
-    initial_chunks = await VectorService.query_similar_chunks(
+    # initial_chunks
+    reranked_chunks = await VectorService.query_similar_chunks(
         query_embedding=query_embedd, qdrant=qdrant, top_k=20
     )
 
     # Step 3: Rerank chunks using custom scoring
-    reranked_chunks = RerankerService.rerank_chunks(
-        chunks=initial_chunks,
-        top_k=10,  # Get top 10 after reranking
-        include_adjacent=True,  # Include adjacent chunks for context
-    )
+    # reranked_chunks = RerankerService.rerank_chunks(
+    #     chunks=initial_chunks,
+    #     top_k=10,  # Get top 10 after reranking
+    #     include_adjacent=True,  # Include adjacent chunks for context
+    # )
 
     # Step 4: Enforce token budget to avoid context overflow
     final_chunks = RerankerService.enforce_token_budget(
         chunks=reranked_chunks,
-        max_tokens=4000,  # Adjust based on your LLM's context window
     )
+    print(f"Final chunks selected: {len(final_chunks)}")
 
     # Step 5: Format context for LLM
     merged_context = VectorService.format_context(final_chunks)

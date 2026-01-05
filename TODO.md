@@ -128,8 +128,8 @@
 
 ## PHASE 4 — Conversation Management (30 min | 8 pts)
 
-- [ ] Persist chat history
-- [ ] Keep last N messages verbatim
+- [x] Persist chat history
+- [x] Keep last N messages verbatim
 - [ ] Summarize older messages
 - [ ] Track:
   - [ ] documents discussed
@@ -145,9 +145,9 @@
 ### Robustness Scenarios
 
 - [ ] Detect contradictory policies (v1 vs v2)
-- [ ] Handle partial info (say “not specified”)
-- [ ] Detect out-of-scope questions
-- [ ] Handle ambiguous queries
+- [x] Handle partial info (say “not specified”)
+- [x] Detect out-of-scope questions
+- [x] Handle ambiguous queries
 
 ---
 
@@ -177,7 +177,7 @@
 
 ## ⭐ BONUS (Only If Time Left)
 
-- [ ] Streaming responses with citations
+- [x] Streaming responses with citations
 - [ ] Semantic caching
 - [ ] Query decomposition
 - [ ] Feedback loop
@@ -186,17 +186,9 @@
 
 ## 🎯 FINAL SANITY CHECK (10 min)
 
-- [ ] System says “I don’t know” when unsure
-- [ ] Citations actually support answers
+- [x] System says “I don’t know” when unsure
+- [x] Citations actually support answers
 - [ ] README explains **why**, not just **what**
 - [ ] No default-only logic
 
 ---
-
-If you want next, I can:
-
-- Convert this into a **GitHub issue board**
-- Mark **absolute must-do vs nice-to-have**
-- Give you a **minimal 70-point survival plan**
-
-Just tell me how aggressive you want to be.

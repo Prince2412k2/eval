@@ -6,6 +6,7 @@ from app.schema.chunk import Chunk
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 from app.service.upload_service import DocumentCRUD
+from app.core.embedding import get_embbed
 
 
 class EmbeddingService:
@@ -15,9 +16,8 @@ class EmbeddingService:
         Embed chunk texts and return embeddings.
         Returns vectors of 384 dimensions.
         """
-        from app.core.embedding import get_embbed
 
-        texts = [chunk.text for chunk in chunks]
+        texts = [chunk.text.lower().strip() for chunk in chunks]
         return get_embbed().embed(texts)
 
     @staticmethod
@@ -92,7 +92,7 @@ class VectorService:
     async def query_similar_chunks(
         qdrant: AsyncQdrantClient,
         query_embedding: np.ndarray,
-        top_k: int = 15,
+        top_k: int = 20,
         score_threshold: Optional[float] = None,
     ) -> List[Dict]:
         """
@@ -141,11 +141,14 @@ class VectorService:
             Formatted context string
         """
         context = ""
-        for chunk in chunks_data:
-            page = chunk.get("page", "N/A")
+        for idx, chunk in enumerate(chunks_data):
             score = chunk.get("score", 0.0)
             text = chunk.get("text", "")
-            context += f"[Page {page}] (Score: {score:.4f})\n{text}\n---\n\n"
+            context += (
+                f"### Chunk{idx + 1} \n **Score**: {score:.4f})\n - {text}\n---\n\n"
+            )
+
+        print(context)
         return context
 
     @staticmethod
