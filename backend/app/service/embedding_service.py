@@ -148,7 +148,6 @@ class VectorService:
                 f"### Chunk{idx + 1} \n **Score**: {score:.4f})\n - {text}\n---\n\n"
             )
 
-        print(context)
         return context
 
     @staticmethod

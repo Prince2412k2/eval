@@ -76,7 +76,7 @@ The citation system uses a **parallel triple-LLM approach** to provide transpare
 1. **Security Guard** (Input Validation): `openai/gpt-oss-120b` runs in parallel to check for prompt injections and malicious content
    - **Cost**: ~$0.075 per 1M tokens (13.3M tokens/$1)
    - **Scope**: Only processes input tokens (user query), not context
-   - **Latency**: ~500ms
+   - **Latency**: ~1,000 TPS
    - **Purpose**: Prevents jailbreaks, prompt injections, and adversarial attacks
 
 2. **Citation Extraction** (Fast Model): `llama-3.1-8b-instant` runs in parallel with the main response, extracting structured citations in JSON format
@@ -89,7 +89,7 @@ The citation system uses a **parallel triple-LLM approach** to provide transpare
    - **Latency**: 1,000 TPS
    - **Output**: Natural language answer with streaming
 
-**Total latency**: ~2-3 seconds (parallel execution means we wait for the slowest component, not the sum).
+**Total latency**: ~1 seconds (parallel execution means we wait for the slowest component, not the sum).
 
 **Total cost per query**: ~$0.0015-0.002 (depending on context size and response length).
 
