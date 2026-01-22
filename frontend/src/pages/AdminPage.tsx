@@ -47,7 +47,7 @@ interface UploadFileStatus {
   status: 'uploading' | 'success' | 'failed' | 'duplicate';
   progress?: string;
   error?: string;
-  result?: any;
+  result?: unknown;
 }
 
 function AdminPage() {
@@ -60,7 +60,7 @@ function AdminPage() {
   const [multiFileUploading, setMultiFileUploading] = useState(false);
   const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-
+  const API_URL = import.meta.env.VITE_API_URL
   useEffect(() => {
     loadData();
   }, []);
@@ -73,7 +73,7 @@ function AdminPage() {
 
   const loadMetrics = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/metrics');
+      const response = await fetch(`${API_URL}/api/admin/metrics`);
       if (response.ok) {
         const data = await response.json();
         setMetrics(data);
@@ -85,7 +85,7 @@ function AdminPage() {
 
   const loadDocuments = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/documents');
+      const response = await fetch(`${API_URL}/api/admin/documents`);
       if (response.ok) {
         const data = await response.json();
         setDocuments(data.documents || []);
@@ -102,7 +102,7 @@ function AdminPage() {
 
     setDeleting(docId);
     try {
-      const response = await fetch(`http://localhost:8000/api/admin/documents/${docId}`, {
+      const response = await fetch(`${API_URL}/api/admin/documents/${docId}`, {
         method: 'DELETE'
       });
 
@@ -131,7 +131,7 @@ function AdminPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8000/api/upload', {
+      const response = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         body: formData
       });
@@ -179,7 +179,7 @@ function AdminPage() {
         formData.append('files', file);
       });
 
-      const response = await fetch('http://localhost:8000/api/upload/bulk', {
+      const response = await fetch(`${API_URL}/api/upload/bulk`, {
         method: 'POST',
         body: formData
       });

@@ -13,7 +13,7 @@ services:
     volumes:
       - ./backend:/app
       - backend_cache:/root/.cache
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -36,7 +36,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=https://chat.api.sniffkin.tech
     depends_on:
       - backend
     networks:
