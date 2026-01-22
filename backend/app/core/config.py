@@ -17,6 +17,7 @@ class Settings:
         self.SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
         self.SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
         self.SECRET_KEY = os.environ.get("SECRET_KEY", "")
+        self.ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "")
 
 
 @dataclass

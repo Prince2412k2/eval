@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from app.core.config import Settings, settings
 from fastapi import FastAPI
 from app.core.embedding import embbed_model
 from app.core.database import init_db
@@ -32,7 +33,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:5173"],
+    allow_origins=[settings.ALLOWED_ORIGIN],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
